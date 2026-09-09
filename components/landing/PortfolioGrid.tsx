@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { Badge } from "@/components/ui/badge";
 import { Layers, Sparkles } from "lucide-react";
+import { ExpandableDescription } from "./ExpandableDescription";
 
 type PortfolioRow = {
   id: string;
@@ -100,7 +101,7 @@ export async function PortfolioGrid() {
             </div>
             <div className="p-5 space-y-2">
               <h3 className="font-bold text-slate-900 dark:text-white leading-tight line-clamp-1 group-hover:text-orange-500 transition-colors">{item.titulo}</h3>
-              <p className="text-xs text-slate-600 dark:text-neutral-500 line-clamp-2 leading-relaxed">{item.descripcion}</p>
+              <ExpandableDescription text={item.descripcion} />
             </div>
           </article>
         ))}

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Link2, Palette, User, Gift, Sparkles, Check, Upload } from "lucide-react";
 import { WizardShell } from "./WizardShell";
@@ -10,42 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { useSupabaseUpload } from "@/lib/useSupabaseUpload";
 import { createClient } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/toaster";
-import { useMateriales } from "@/lib/useMateriales";
-
-const acabados = [
-  { id: "Brillante", label: "Brillante", desc: "Colores vivos, superficie lisa. Ideal figuras y regalos.", emoji: "✨", gradient: "from-orange-400 to-orange-600" },
-  { id: "Mate", label: "Mate", desc: "Elegante y sin brillo. Perfecto decoración moderna.", emoji: "🎨", gradient: "from-zinc-600 to-zinc-800" },
-  { id: "Resistente", label: "Resistente", desc: "Más fuerte, para piezas que se usan a diario.", emoji: "🛡️", gradient: "from-emerald-500 to-teal-600" },
-];
-
-// Fallback estático si Supabase no responde (mantener UX previa)
-const coloresFallback = [
-  { name: "Blanco Nube", hex: "#fafafa" },
-  { name: "Negro Noche", hex: "#18181b" },
-  { name: "Rosa Pastel", hex: "#f9a8d4" },
-  { name: "Celeste", hex: "#7dd3fc" },
-  { name: "Violeta", hex: "#a78bfa" },
-  { name: "Verde Lima", hex: "#a3e635" },
-  { name: "Amarillo Sol", hex: "#fde047" },
-  { name: "Rojo", hex: "#ef4444" },
-  { name: "Rojo Cereza", hex: "#f87171" },
-];
-
-const hexMap: Record<string, string> = {
-  "Blanco Nube": "#fafafa",
-  "Negro Noche": "#18181b",
-  "Rosa Pastel": "#f9a8d4",
-  Celeste: "#7dd3fc",
-  Violeta: "#a78bfa",
-  "Verde Lima": "#a3e635",
-  "Amarillo Sol": "#fde047",
-  Rojo: "#ef4444",
-  "Rojo Cereza": "#f87171",
-};
 
 const STEPS = [
   { id: 1, label: "Tu modelo", icon: Link2 },
-  { id: 2, label: "Color y acabado", icon: Palette },
+  { id: 2, label: "Color y estilo", icon: Palette },
   { id: 3, label: "Contacto", icon: User },
 ];
 
@@ -63,17 +31,39 @@ export function CasualWizard() {
   const router = useRouter();
   const { toast } = useToast();
   const uploader = useSupabaseUpload();
-  const { materiales: materialesCasual, loading: loadingCasual } = useMateriales("casual");
 
-  // Mapeo dinámico: si hay datos en Supabase, usarlos; sino fallback estático
-  const colores = materialesCasual.length > 0 ? materialesCasual.map((m) => ({ name: m.nombre, hex: hexMap[m.nombre] ?? "#a1a1aa" })) : coloresFallback;
+  // EXTRACCIÓN DE DATOS (Fetch): materiales casuales disponibles
+  const [availableColors, setAvailableColors] = useState<{ id: string; nombre: string }[]>([]);
+  const [loadingColors, setLoadingColors] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchColors() {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.from("materiales").select("id, nombre").eq("categoria", "casual").eq("estado", "Disponible").order("nombre", { ascending: true });
+        if (error) throw error;
+        if (!cancelled) {
+          setAvailableColors((data ?? []) as { id: string; nombre: string }[]);
+        }
+      } catch {
+        if (!cancelled) setAvailableColors([]);
+      } finally {
+        if (!cancelled) setLoadingColors(false);
+      }
+    }
+    fetchColors();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [step, setStep] = useState(1);
   const [enlace, setEnlace] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [acabado, setAcabado] = useState("Brillante");
-  const [color, setColor] = useState("Blanco Nube");
+  const [estiloColor, setEstiloColor] = useState<"single" | "multicolor">("single");
+  const [color, setColor] = useState("");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -82,14 +72,25 @@ export function CasualWizard() {
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Color efectivo: si llega el fetch dinámico y el color actual ya no existe, usa el primero de la lista
-  const selectedColor = colores.length > 0 && !colores.some((c) => c.name === color) ? colores[0].name : color;
+  // Selecciona primer color disponible automáticamente
+  useEffect(() => {
+    if (availableColors.length > 0 && !color) {
+      setColor(availableColors[0].nombre);
+    }
+  }, [availableColors, color]);
 
-  // Validación Fase 2 ajustada WhatsApp-first (Zod: email opcional, teléfono obligatorio)
-  // Antes: email requerido con regex estricto. Ahora: z.string().email().optional().or(z.literal(''))
+  // Si se queda con menos de 2 colores, forzar single
+  useEffect(() => {
+    if (availableColors.length < 2 && estiloColor === "multicolor") {
+      setEstiloColor("single");
+    }
+  }, [availableColors.length, estiloColor]);
+
+  const selectedColor = color;
+
   const isEmailOptionalValid = (v: string) => v.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
   const paso1Ok = Boolean(file) || isValidUrl(enlace);
-  const paso2Ok = Boolean(acabado && selectedColor);
+  const paso2Ok = Boolean(selectedColor);
   const paso3Ok = nombre.trim().length >= 2 && telefono.replace(/\D/g, "").length >= 8 && isEmailOptionalValid(email);
   const canGoNext = step === 1 ? paso1Ok : step === 2 ? paso2Ok : paso3Ok;
 
@@ -116,18 +117,15 @@ export function CasualWizard() {
     try {
       let enlaceArchivo = enlace.trim() || "";
 
-      // 1) SUBIDA: imagen de referencia al bucket público casual-uploads con nombre único
       if (file) {
         const { path } = await uploader.upload(file, { bucket: "casual-uploads", prefix: "casual", maxSizeMB: 5 });
-        enlaceArchivo = path; // ej: casual-uploads/referencias/casual_xxx.jpg — esta ruta se guarda en DB
+        enlaceArchivo = path;
       }
 
       if (!enlaceArchivo) throw new Error("Debes subir una imagen de referencia o pegar un enlace");
 
-      // 2) INSERT: luego de tener la ruta, insertar con tipo_pedido casual y metadata flexible + telefono (wa.me) + nombre columna
-      // ENVÍO SEGURO: si email está vacío, enviar null/undefined sin romper esquema Supabase
       const telefonoNorm = telefono.replace(/\s+/g, " ").trim();
-      const emailNorm = email.trim() === "" ? null : email.trim(); // Zod optional: "" -> null
+      const emailNorm = email.trim() === "" ? null : email.trim();
       const nombreNorm = nombre.trim();
       const supabase = createClient();
       const { error: insertError } = await supabase.from("solicitudes").insert({
@@ -138,16 +136,15 @@ export function CasualWizard() {
         nombre: nombreNorm || null,
         metadata: {
           color: selectedColor,
-          acabado,
+          estiloColor,
           nota: nota.trim() || undefined,
           nombre: nombreNorm,
-          ...(emailNorm ? { email: emailNorm } : {}), // no enviar "" para evitar error de esquema
+          ...(emailNorm ? { email: emailNorm } : {}),
           telefono: telefonoNorm,
         },
       });
 
       if (insertError) {
-        // fallback dev: si Supabase no tiene tabla (local sin env), intenta API route
         const res = await fetch("/api/solicitudes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -158,7 +155,7 @@ export function CasualWizard() {
             nombre: nombreNorm,
             metadata: {
               color: selectedColor,
-              acabado,
+              estiloColor,
               nota: nota.trim() || undefined,
               nombre: nombreNorm,
               ...(emailNorm ? { email: emailNorm } : {}),
@@ -202,7 +199,6 @@ export function CasualWizard() {
             <p className="text-sm text-slate-500 dark:text-zinc-400">Sube una imagen de referencia o pega un link de tu modelo.</p>
           </div>
 
-          {/* Imagen de referencia */}
           <div className="space-y-3">
             <Label>Subir imagen de referencia *</Label>
             <input
@@ -267,33 +263,40 @@ export function CasualWizard() {
         <div className="space-y-6">
           <div className="space-y-1">
             <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Elige cómo se verá</h2>
-            <p className="text-sm text-slate-500 dark:text-zinc-400">Personaliza el acabado y el color de tu pieza.</p>
+            <p className="text-sm text-slate-500 dark:text-zinc-400">Personaliza el estilo y el color de tu pieza según el inventario disponible.</p>
           </div>
           <div>
-            <p className="text-xs font-bold tracking-widest uppercase text-slate-900 dark:text-white mb-3">Acabado *</p>
-            <div className="grid gap-3">
-              {acabados.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => setAcabado(a.id)}
-                  className={`text-left rounded-2xl border-2 p-4 flex items-center gap-4 transition-all ${acabado === a.id ? "border-orange-500 bg-orange-500/10" : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-600"}`}
-                >
-                  <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${a.gradient} flex items-center justify-center text-lg shrink-0`}>{a.emoji}</div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-slate-900 dark:text-white">{a.label}</p>
-                    <p className="text-xs text-slate-500 dark:text-zinc-400">{a.desc}</p>
-                  </div>
-                  <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${acabado === a.id ? "border-orange-500 bg-orange-500" : "border-slate-300 dark:border-zinc-600"}`}>
-                    {acabado === a.id && <Check className="h-3 w-3 text-white" />}
-                  </div>
-                </button>
-              ))}
+            <p className="text-xs font-bold tracking-widest uppercase text-slate-900 dark:text-white mb-3">ESTILO DE COLOR *</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setEstiloColor("single")}
+                className={`rounded-2xl border-2 p-4 text-left transition-all ${estiloColor === "single" ? "border-orange-500 bg-orange-500/10" : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-600"}`}
+              >
+                <p className="text-sm font-bold text-slate-900 dark:text-white">Un solo color</p>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">Siempre activa.</p>
+                {estiloColor === "single" && <span className="mt-2 inline-flex text-[11px] font-bold text-orange-500">✓ Seleccionado</span>}
+              </button>
+              <button
+                type="button"
+                disabled={availableColors.length < 2}
+                onClick={() => {
+                  if (availableColors.length >= 2) setEstiloColor("multicolor");
+                }}
+                className={`rounded-2xl border-2 p-4 text-left transition-all ${estiloColor === "multicolor" ? "border-orange-500 bg-orange-500/10" : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-600"} ${availableColors.length < 2 ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <p className="text-sm font-bold text-slate-900 dark:text-white">Multicolor (AMS)</p>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">Varios colores en una pieza.</p>
+                {estiloColor === "multicolor" && availableColors.length >= 2 && <span className="mt-2 inline-flex text-[11px] font-bold text-orange-500">✓ Seleccionado</span>}
+              </button>
             </div>
+            {availableColors.length < 2 && (
+              <p className="mt-2 text-xs text-amber-500">Requiere al menos 2 colores en stock. Próximamente.</p>
+            )}
           </div>
           <div>
-            <p className="text-xs font-bold tracking-widest uppercase text-slate-900 dark:text-white mb-3">Color * {loadingCasual && <span className="text-[11px] font-normal normal-case tracking-normal text-slate-500 dark:text-zinc-400">· Cargando materiales...</span>}</p>
-            {loadingCasual ? (
+            <p className="text-xs font-bold tracking-widest uppercase text-slate-900 dark:text-white mb-3">Color * {loadingColors && <span className="text-[11px] font-normal normal-case tracking-normal text-slate-500 dark:text-zinc-400">· Cargando materiales...</span>}</p>
+            {loadingColors ? (
               <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="flex flex-col items-center gap-2 animate-pulse">
@@ -302,16 +305,18 @@ export function CasualWizard() {
                   </div>
                 ))}
               </div>
-            ) : colores.length === 0 ? (
+            ) : availableColors.length === 0 ? (
               <p className="text-xs text-amber-400">No hay colores disponibles en este momento.</p>
             ) : (
               <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
-                {colores.map((c) => (
-                  <button key={c.name} type="button" onClick={() => setColor(c.name)} className="flex flex-col items-center gap-2">
-                    <span className={`h-11 w-11 rounded-2xl border-2 flex items-center justify-center transition-all ${selectedColor === c.name ? "border-orange-500 ring-2 ring-orange-500/30 scale-105" : "border-slate-200 dark:border-zinc-700 hover:border-slate-300 dark:hover:border-zinc-600"}`} style={{ background: c.hex }}>
-                      {selectedColor === c.name && <Check className={`h-4 w-4 ${c.hex === "#fafafa" ? "text-zinc-900" : "text-white drop-shadow"}`} />}
+                {availableColors.map((c) => (
+                  <button key={c.id} type="button" onClick={() => setColor(c.nombre)} className="flex flex-col items-center gap-2">
+                    <span
+                      className={`h-11 w-11 rounded-2xl border-2 flex items-center justify-center text-xs font-bold transition-all ${selectedColor === c.nombre ? "border-orange-500 ring-2 ring-orange-500/30 scale-105 bg-orange-500 text-white" : "border-slate-200 dark:border-zinc-700 bg-slate-100 dark:bg-zinc-800 hover:border-slate-300 dark:hover:border-zinc-600 text-slate-600 dark:text-zinc-300"}`}
+                    >
+                      {selectedColor === c.nombre ? <Check className="h-4 w-4" /> : c.nombre.charAt(0).toUpperCase()}
                     </span>
-                    <span className={`text-[10px] font-semibold ${selectedColor === c.name ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-zinc-400"}`}>{c.name}</span>
+                    <span className={`text-[10px] font-semibold text-center leading-tight ${selectedColor === c.nombre ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-zinc-400"}`}>{c.nombre}</span>
                   </button>
                 ))}
               </div>
@@ -362,7 +367,7 @@ export function CasualWizard() {
             <p className="text-xs font-bold text-slate-900 dark:text-white">Resumen</p>
             <div className="text-xs text-slate-500 dark:text-zinc-400 space-y-1">
               <p>🔗 Modelo: <span className="text-slate-900 dark:text-white break-all">{file ? `${file.name} → se subirá a casual-uploads` : enlace || "—"}</span></p>
-              <p>🎨 {acabado} · {selectedColor}</p>
+              <p>🎨 {estiloColor === "single" ? "Un solo color" : "Multicolor (AMS)"} · {selectedColor || "—"}</p>
               <p>📧 {nombre || "—"} — {email || "—"}</p>
               <p>📱 WhatsApp: <span className="text-slate-900 dark:text-white">{telefono || "—"}</span></p>
             </div>

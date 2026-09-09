@@ -55,7 +55,7 @@ export default function PortfolioManager({ initialItems }: { initialItems: Portf
 
     try {
       const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const fileName = `portfolio_${crypto.randomUUID()}.${ext}`;
+      const fileName = `portfolio_${Date.now().toString(36) + Math.random().toString(36).substring(2)}.${ext}`;
       const path = `proyectos/${fileName}`;
 
       // Simula progreso (Supabase storage no expone onProgress)

@@ -295,6 +295,7 @@ function SolicitudCard({
         <div className="flex gap-2">
           <input
             type="number"
+            suppressHydrationWarning
             min="0"
             step="0.01"
             placeholder="Ej. 89.90"
