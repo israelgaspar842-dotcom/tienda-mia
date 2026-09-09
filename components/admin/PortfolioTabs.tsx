@@ -10,6 +10,7 @@ type PortfolioRow = {
   titulo: string;
   descripcion: string;
   imagen_url: string;
+  galeria?: string[] | null;
   categoria: "regalo" | "prototipo";
   created_at: string;
   es_destacado: boolean;

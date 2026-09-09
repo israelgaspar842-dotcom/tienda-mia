@@ -99,6 +99,13 @@ ALTER TABLE public.portfolio ADD COLUMN IF NOT EXISTS es_destacado boolean NOT N
 COMMENT ON COLUMN public.portfolio.es_destacado IS 'Marca si el proyecto aparece como destacado en la landing / admin switch';
 CREATE INDEX IF NOT EXISTS idx_portfolio_destacado ON public.portfolio (es_destacado) WHERE es_destacado = true;
 
--- 7. Verificación
+-- 7. Columna galeria — Soporte múltiples imágenes (máx 3) con Doble Escritura
+-- Estrategia: imagen_url mantiene retrocompatibilidad (uploadedUrls[0]), galeria guarda arreglo completo
+ALTER TABLE public.portfolio ADD COLUMN IF NOT EXISTS galeria text[] NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN public.portfolio.galeria IS 'Arreglo de URLs públicas de portfolio-images. Doble escritura: imagen_url = galeria[1] para frontend legacy';
+-- Backfill para filas existentes: copia imagen_url a galeria si está vacío
+UPDATE public.portfolio SET galeria = ARRAY[imagen_url] WHERE galeria = '{}' OR galeria IS NULL;
+
+-- 8. Verificación
 -- SELECT id, titulo, es_destacado FROM public.portfolio ORDER BY created_at DESC;
 -- SELECT * FROM storage.buckets WHERE id='portfolio-images';

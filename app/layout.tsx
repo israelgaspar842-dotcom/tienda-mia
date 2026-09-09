@@ -16,8 +16,23 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "INVENTOV — Materializar ideas con precisión",
-  description:
-    "Impresión 3D profesional. Cotiza regalos y prototipos de ingeniería con tolerancias precisas. Naranja industrial, precisión real.",
+  description: "Impresión 3D profesional. Cotiza regalos y prototipos de ingeniería.",
+  openGraph: {
+    title: "INVENTOV — Impresión 3D",
+    description: "Impresión 3D bajo demanda. Desde prototipos hasta series cortas.",
+    url: "https://inventov3d.vercel.app",
+    siteName: "INVENTOV",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "INVENTOV Portada",
+      },
+    ],
+    locale: "es_BO",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

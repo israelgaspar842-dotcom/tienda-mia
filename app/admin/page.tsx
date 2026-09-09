@@ -9,6 +9,7 @@ type PortfolioRow = {
   titulo: string;
   descripcion: string;
   imagen_url: string;
+  galeria?: string[] | null;
   categoria: "regalo" | "prototipo";
   created_at: string;
   es_destacado: boolean;
@@ -28,10 +29,10 @@ export default async function AdminPage() {
     const supabase = await createServerSupabaseClient();
     const [solicRes, portRes] = await Promise.all([
       supabase.from("solicitudes").select("*").order("created_at", { ascending: false }),
-      // Lectura incluye nuevo campo es_destacado — requisito: SELECT id, titulo, es_destacado FROM portfolio (ampliado para grid)
+      // Lectura incluye nuevos campos es_destacado y galeria — requisito: SELECT id, titulo, es_destacado FROM portfolio (ampliado para grid + galeria)
       supabase
         .from("portfolio")
-        .select("id, titulo, descripcion, imagen_url, categoria, created_at, es_destacado")
+        .select("id, titulo, descripcion, imagen_url, galeria, categoria, created_at, es_destacado")
         .order("created_at", { ascending: false }),
     ]);
 

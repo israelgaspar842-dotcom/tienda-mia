@@ -1,33 +1,57 @@
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
+"use client";
+
+import { useState, useEffect } from "react";
+import Lightbox from "yet-another-react-lightbox";
+import "yet-another-react-lightbox/styles.css";
+import { createClient } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Layers, Sparkles } from "lucide-react";
 import { ExpandableDescription } from "./ExpandableDescription";
+
+// Referencia especificación: slides={proyecto.galeria.map((url) => ({ src: url }))}
 
 type PortfolioRow = {
   id: string;
   titulo: string;
   descripcion: string;
   imagen_url: string;
+  galeria?: string[] | null;
   categoria: "regalo" | "prototipo";
   created_at: string;
 };
 
-export async function PortfolioGrid() {
-  let items: PortfolioRow[] = [];
-  let error: string | null = null;
+export function PortfolioGrid() {
+  const [items, setItems] = useState<PortfolioRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [currentImage, setCurrentImage] = useState("");
+  const [currentGallery, setCurrentGallery] = useState<string[]>([]);
 
-  try {
-    const supabase = await createServerSupabaseClient();
-    const { data, error: qError } = await supabase
-      .from("portfolio")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (qError) throw qError;
-    items = (data ?? []) as PortfolioRow[];
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Error cargando portfolio";
-    items = [];
-  }
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchPortfolio() {
+      try {
+        const supabase = createClient();
+        const { data, error: qError } = await supabase
+          .from("portfolio")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (qError) throw qError;
+        if (!cancelled) {
+          setItems((data ?? []) as PortfolioRow[]);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Error cargando portfolio");
+          setItems([]);
+        }
+      }
+    }
+    fetchPortfolio();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Estado vacío elegante
   if (items.length === 0) {
@@ -52,6 +76,11 @@ export async function PortfolioGrid() {
           </div>
           {error && <p className="text-xs font-mono text-amber-500/70">({error})</p>}
         </div>
+        <Lightbox
+          open={isOpen}
+          close={() => setIsOpen(false)}
+          slides={currentGallery.length > 0 ? currentGallery.map((url) => ({ src: url })) : [{ src: currentImage }]}
+        />
       </section>
     );
   }
@@ -72,40 +101,55 @@ export async function PortfolioGrid() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {items.map((item) => (
+        {items.map((proyecto) => (
           <article
-            key={item.id}
+            key={proyecto.id}
             className="group relative rounded-[24px] overflow-hidden border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 hover:border-slate-300 dark:hover:border-neutral-700 transition-all duration-300 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1"
           >
             <div className="relative h-56 overflow-hidden bg-slate-100 dark:bg-neutral-900">
-              {/* Usa URL pública de portfolio-images — next/image ya permitido via remotePatterns */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={item.imagen_url}
-                alt={item.titulo}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                src={proyecto.imagen_url}
+                alt={proyecto.titulo}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 cursor-pointer"
                 loading="lazy"
+                onClick={() => {
+                  const galeria = proyecto.galeria && proyecto.galeria.length > 0 ? proyecto.galeria : [proyecto.imagen_url];
+                  setCurrentGallery(galeria);
+                  setCurrentImage(proyecto.imagen_url);
+                  setIsOpen(true);
+                }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 dark:from-neutral-900 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 dark:from-neutral-900 via-transparent to-transparent pointer-events-none" />
               <div className="absolute top-3 left-3">
                 <span
                   className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full border ${
-                    item.categoria === "regalo"
+                    proyecto.categoria === "regalo"
                       ? "bg-orange-500 text-white border-orange-600"
                       : "bg-white/90 dark:bg-neutral-900/90 backdrop-blur border-slate-200 dark:border-neutral-700 text-slate-700 dark:text-neutral-200"
                   }`}
                 >
-                  {item.categoria === "regalo" ? "Regalo" : "Prototipo"}
+                  {proyecto.categoria === "regalo" ? "Regalo" : "Prototipo"}
                 </span>
               </div>
+              {proyecto.galeria && proyecto.galeria.length > 1 && (
+                <span className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm">
+                  1 / {proyecto.galeria.length}
+                </span>
+              )}
             </div>
             <div className="p-5 space-y-2">
-              <h3 className="font-bold text-slate-900 dark:text-white leading-tight line-clamp-1 group-hover:text-orange-500 transition-colors">{item.titulo}</h3>
-              <ExpandableDescription text={item.descripcion} />
+              <h3 className="font-bold text-slate-900 dark:text-white leading-tight line-clamp-1 group-hover:text-orange-500 transition-colors">{proyecto.titulo}</h3>
+              <ExpandableDescription text={proyecto.descripcion} />
             </div>
           </article>
         ))}
       </div>
+      <Lightbox
+        open={isOpen}
+        close={() => setIsOpen(false)}
+        slides={currentGallery.length > 0 ? currentGallery.map((url) => ({ src: url })) : [{ src: currentImage }]}
+      />
     </section>
   );
 }
