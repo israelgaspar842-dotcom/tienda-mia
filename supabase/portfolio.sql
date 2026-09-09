@@ -93,6 +93,12 @@ INSERT INTO public.portfolio (titulo, descripcion, imagen_url, categoria) VALUES
   ('Carcasa Raspberry Pi 5', 'Tolerancias 0.2mm, ventilación activa. PETG Negro.', 'https://images.unsplash.com/photo-1555664424-778a1e5e1b48?w=600&q=80', 'prototipo')
 ON CONFLICT DO NOTHING;
 
--- 6. Verificación
--- SELECT * FROM public.portfolio ORDER BY created_at DESC;
+-- 6. Columna es_destacado — Switch destacados en Admin
+-- Requisito: interfaz para alternar estado booleano por proyecto
+ALTER TABLE public.portfolio ADD COLUMN IF NOT EXISTS es_destacado boolean NOT NULL DEFAULT false;
+COMMENT ON COLUMN public.portfolio.es_destacado IS 'Marca si el proyecto aparece como destacado en la landing / admin switch';
+CREATE INDEX IF NOT EXISTS idx_portfolio_destacado ON public.portfolio (es_destacado) WHERE es_destacado = true;
+
+-- 7. Verificación
+-- SELECT id, titulo, es_destacado FROM public.portfolio ORDER BY created_at DESC;
 -- SELECT * FROM storage.buckets WHERE id='portfolio-images';

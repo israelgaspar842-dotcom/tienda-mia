@@ -11,10 +11,16 @@ type PortfolioRow = {
   imagen_url: string;
   categoria: "regalo" | "prototipo";
   created_at: string;
+  es_destacado: boolean;
 };
 
 export default function PortfolioManager({ initialItems }: { initialItems: PortfolioRow[] }) {
-  const [items, setItems] = useState<PortfolioRow[]>(initialItems);
+  const [items, setItems] = useState<PortfolioRow[]>(() =>
+    initialItems.map((row) => ({
+      ...row,
+      es_destacado: Boolean((row as unknown as Record<string, unknown>)["es_destacado"]),
+    }))
+  );
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [categoria, setCategoria] = useState<"regalo" | "prototipo">("regalo");
@@ -24,6 +30,7 @@ export default function PortfolioManager({ initialItems }: { initialItems: Portf
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextFile = e.target.files?.[0] ?? null;
@@ -34,8 +41,42 @@ export default function PortfolioManager({ initialItems }: { initialItems: Portf
 
   const refresh = async () => {
     const supabase = createClient();
-    const { data } = await supabase.from("portfolio").select("*").order("created_at", { ascending: false });
-    if (data) setItems(data as PortfolioRow[]);
+    // Lectura de Datos — requisito: SELECT id, titulo, es_destacado FROM portfolio (extendido con resto de campos para la tarjeta)
+    const { data } = await supabase
+      .from("portfolio")
+      .select("id, titulo, descripcion, imagen_url, categoria, created_at, es_destacado")
+      .order("created_at", { ascending: false });
+    if (data)
+      setItems(
+        (data as PortfolioRow[]).map((row) => ({
+          ...row,
+          es_destacado: Boolean((row as unknown as Record<string, unknown>)["es_destacado"]),
+        }))
+      );
+  };
+
+  /**
+   * Mutación — alterna es_destacado invirtiendo el valor actual.
+   * Hace UPDATE directo a Supabase y deshabilita el switch mientras viaja la petición.
+   */
+  const toggleDestacado = async (id: string, estadoActual: boolean) => {
+    if (togglingId) return;
+    setTogglingId(id);
+    setError("");
+    try {
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from("portfolio")
+        .update({ es_destacado: !estadoActual })
+        .eq("id", id);
+      if (updateError) throw new Error(updateError.message);
+      // Optimista: actualiza estado local
+      setItems((prev) => prev.map((p) => (p.id === id ? { ...p, es_destacado: !estadoActual } : p)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al actualizar destacado");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,8 +135,12 @@ export default function PortfolioManager({ initialItems }: { initialItems: Portf
       if (preview) URL.revokeObjectURL(preview);
       setPreview(null);
       setProgress(0);
-      // Optimista: prepend
-      setItems((prev) => [inserted as PortfolioRow, ...prev]);
+      // Optimista: prepend (normaliza es_destacado)
+      const normalized = {
+        ...(inserted as PortfolioRow),
+        es_destacado: Boolean((inserted as unknown as Record<string, unknown>)["es_destacado"]),
+      } as PortfolioRow;
+      setItems((prev) => [normalized, ...prev]);
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al guardar");
@@ -263,7 +308,38 @@ export default function PortfolioManager({ initialItems }: { initialItems: Portf
                 <div className="p-4 flex-1 flex flex-col gap-2">
                   <h4 className="font-bold text-white leading-tight line-clamp-1">{p.titulo}</h4>
                   <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed flex-1">{p.descripcion}</p>
-                  <div className="flex items-center justify-between pt-2">
+                  {/* Switch es_destacado — requisito UI */}
+                  <div className="flex items-center justify-between pt-3 mt-1 border-t border-zinc-800">
+                    <span
+                      className={`text-[11px] font-bold tracking-widest uppercase flex items-center gap-1.5 ${p.es_destacado ? "text-orange-400" : "text-zinc-500"}`}
+                    >
+                      <Sparkles className="h-3 w-3" /> Destacado
+                    </span>
+                    <button
+                      role="switch"
+                      aria-checked={!!p.es_destacado}
+                      aria-label={`Alternar destacado para ${p.titulo}`}
+                      disabled={togglingId === p.id}
+                      onClick={() => toggleDestacado(p.id, !!p.es_destacado)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        p.es_destacado ? "bg-orange-500" : "bg-zinc-700"
+                      } ${togglingId === p.id ? "opacity-60" : ""}`}
+                      title={p.es_destacado ? "Quitar destacado" : "Marcar como destacado"}
+                    >
+                      {togglingId === p.id ? (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <Loader2 className="h-3 w-3 animate-spin text-white" />
+                        </span>
+                      ) : null}
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          p.es_destacado ? "translate-x-5" : "translate-x-0"
+                        } ${togglingId === p.id ? "opacity-0" : ""}`}
+                      />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] font-mono text-zinc-600">{new Date(p.created_at).toLocaleDateString("es-CL")}</span>
                     <button
                       onClick={() => handleDelete(p.id, p.imagen_url)}

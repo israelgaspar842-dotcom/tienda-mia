@@ -12,6 +12,7 @@ type PortfolioRow = {
   imagen_url: string;
   categoria: "regalo" | "prototipo";
   created_at: string;
+  es_destacado: boolean;
 };
 
 export default function PortfolioTabs({

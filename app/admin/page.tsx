@@ -11,6 +11,7 @@ type PortfolioRow = {
   imagen_url: string;
   categoria: "regalo" | "prototipo";
   created_at: string;
+  es_destacado: boolean;
 };
 
 /**
@@ -27,7 +28,11 @@ export default async function AdminPage() {
     const supabase = await createServerSupabaseClient();
     const [solicRes, portRes] = await Promise.all([
       supabase.from("solicitudes").select("*").order("created_at", { ascending: false }),
-      supabase.from("portfolio").select("*").order("created_at", { ascending: false }),
+      // Lectura incluye nuevo campo es_destacado — requisito: SELECT id, titulo, es_destacado FROM portfolio (ampliado para grid)
+      supabase
+        .from("portfolio")
+        .select("id, titulo, descripcion, imagen_url, categoria, created_at, es_destacado")
+        .order("created_at", { ascending: false }),
     ]);
 
     if (solicRes.error) throw new Error(solicRes.error.message);
@@ -49,7 +54,10 @@ export default async function AdminPage() {
       if (!portRes.error.message.includes("does not exist")) errorMsg = portRes.error.message;
       portfolio = [];
     } else {
-      portfolio = (portRes.data ?? []) as PortfolioRow[];
+      portfolio = ((portRes.data ?? []) as PortfolioRow[]).map((row) => ({
+        ...row,
+        es_destacado: Boolean((row as unknown as Record<string, unknown>)["es_destacado"]),
+      }));
     }
   } catch (e) {
     errorMsg = e instanceof Error ? e.message : String(e);

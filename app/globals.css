@@ -6,3 +6,12 @@
 
 /* Forzar a Tailwind a respetar la clase .dark en lugar del SO */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Utilidad para carrusel Hero — Scroll Snap sin barra visible */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
