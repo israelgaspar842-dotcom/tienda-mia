@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@theme {
+  /* Aquí mantendremos las variables automáticas de v4 */
+}
+
+/* Forzar a Tailwind a respetar la clase .dark en lugar del SO */
+@custom-variant dark (&:where(.dark, .dark *));
