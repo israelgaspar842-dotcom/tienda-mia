@@ -47,23 +47,20 @@ export function useSupabaseUpload() {
       const bucket = opts.bucket;
       const isProVault = bucket === "pro-vault";
 
-      // Límites lógicos
-      const defaultMax = isProVault
-        ? file.name.toLowerCase().endsWith(".pdf")
-          ? 20
-          : 50
-        : 5; // casual: imágenes 5MB
+      // Límites lógicos — pro-vault: 20MB para PDF/imágenes diseño, 50MB para modelos 3D
+      const extLower = "." + (file.name.split(".").pop()?.toLowerCase() ?? "");
+      const isProVaultImageOrPdf = [".pdf", ".jpg", ".jpeg", ".png"].includes(extLower);
+      const defaultMax = isProVault ? (isProVaultImageOrPdf ? 20 : 50) : 5; // casual: imágenes 5MB
       const maxMB = opts.maxSizeMB ?? defaultMax;
       if (file.size > maxMB * 1024 * 1024) {
         throw new Error(`Archivo excede ${maxMB}MB (recibido ${(file.size / 1024 / 1024).toFixed(1)}MB)`);
       }
 
       // Validación extensiones
-      const ext = "." + (file.name.split(".").pop()?.toLowerCase() ?? "");
+      const ext = extLower;
       if (isProVault) {
-        const isPdf = ext === ".pdf";
-        const allowedSet = isPdf ? [".pdf"] : [".stl", ".step", ".stp", ".3mf", ".obj"];
-        if (!allowedSet.includes(ext)) throw new Error(`Extensión ${ext} no permitida para pro-vault`);
+        const allowedPro = [".stl", ".step", ".stp", ".3mf", ".obj", ".pdf", ".jpg", ".jpeg", ".png"];
+        if (!allowedPro.includes(ext)) throw new Error(`Extensión ${ext} no permitida para pro-vault`);
       } else {
         const allowedImg = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
         if (!allowedImg.includes(ext)) throw new Error(`Solo imágenes JPG/PNG/WEBP/GIF (recibido ${ext})`);
@@ -72,7 +69,8 @@ export function useSupabaseUpload() {
       const prefix = opts.prefix ?? (isProVault ? "b2b" : "casual");
       const uuid = crypto.randomUUID();
       const fileName = `${prefix}_${uuid}${ext}`;
-      const folder = isProVault ? (ext === ".pdf" ? "planos" : "modelos") : "referencias";
+      const isPlanoExt = [".pdf", ".jpg", ".jpeg", ".png"].includes(ext);
+      const folder = isProVault ? (isPlanoExt ? "planos" : "modelos") : "referencias";
       const storagePath = `${folder}/${fileName}`; // sin bucket
 
       setState({ isUploading: true, progress: 10, error: null, path: null, publicUrl: null });

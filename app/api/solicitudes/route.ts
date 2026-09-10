@@ -170,6 +170,62 @@ export async function POST(req: Request) {
       .single();
 
     if (error) throw new Error(error.message);
+
+    // ──────────────────────────────────────────────────────────────
+    // Notificación Discord en tiempo real (Fire and Forget) — no bloquea al cliente
+    // Requiere DISCORD_WEBHOOK_URL en .env.local
+    // Ubicación: inmediatamente después del INSERT exitoso a solicitudes
+    // ──────────────────────────────────────────────────────────────
+    try {
+      const webhookUrl = process.env.DISCORD_WEBHOOK_URL || process.env.WEBHOOK_URL;
+      if (webhookUrl) {
+        const meta = (metadata ?? {}) as Record<string, unknown>;
+        // Mapeo formData.serviceType === 'diseno' → metadata.requiere_diseno === true
+        const isDiseno = meta["requiere_diseno"] === true;
+        // formData.modelo_url → metadata.modelo_url o enlace_archivo con extensión 3D
+        const hasModeloUrl = Boolean(
+          meta["modelo_url"] || (enlace_archivo && /\.(stl|step|stp|3mf|obj)$/i.test(enlace_archivo))
+        );
+        const discordPayload = {
+          embeds: [
+            {
+              title: "🚨 NUEVA SOLICITUD DE COTIZACIÓN",
+              color: 15277568, // Naranja INVENTOV
+              fields: [
+                {
+                  name: "Servicio",
+                  value: isDiseno ? "Diseño CAD" : "Solo Impresión",
+                  inline: true,
+                },
+                {
+                  name: "Archivos adjuntos",
+                  value: hasModeloUrl ? "Sí (STL/STEP)" : "Solo fotos/planos",
+                  inline: true,
+                },
+              ],
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        };
+
+        // Fire-and-forget: no await — no bloquea la respuesta al cliente si el webhook falla
+        void fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(discordPayload),
+        }).catch((err) => {
+          console.error("[discord webhook] fallo silencioso (no bloquea cliente):", err);
+        });
+      } else {
+        console.warn(
+          "[discord webhook] DISCORD_WEBHOOK_URL no configurada — añade DISCORD_WEBHOOK_URL en .env.local (Discord > Integraciones > Webhooks) para recibir alertas"
+        );
+      }
+    } catch (webhookError) {
+      // Nunca propagar error al cliente
+      console.error("[discord webhook] error al intentar notificar (ignorado):", webhookError);
+    }
+
     return NextResponse.json(data, { status: 201 });
   } catch (e: unknown) {
     console.error("POST /api/solicitudes", e);

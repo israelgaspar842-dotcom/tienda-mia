@@ -71,13 +71,11 @@ export async function Hero() {
             </Badge>
 
             <h1 className="text-4xl md:text-[3.25rem] font-black tracking-tighter leading-[0.9] text-slate-900 dark:text-white">
-              Materializar ideas
-              <br />
-              <span className="text-orange-500">con precisión.</span>
+              Tus ideas. Nuestra <span className="text-orange-500">impresión 3D.</span>
             </h1>
 
             <p className="text-slate-600 dark:text-neutral-400 text-base md:text-lg max-w-xl leading-relaxed">
-              Elige tu camino. Mismo taller, misma calidad — flujo adaptado a tu perfil.
+              Servicio profesional en Sucre. Fabricamos desde regalos personalizados hasta componentes mecánicos para tus proyectos.
             </p>
 
             <div className="grid sm:grid-cols-2 gap-4 pt-2">

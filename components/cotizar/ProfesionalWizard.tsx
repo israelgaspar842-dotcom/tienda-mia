@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Shield, Cpu, Building2, Check, FileBox, Sliders, Ruler, FileText, AlertTriangle, Scale } from "lucide-react";
+import { Upload, Shield, Cpu, Building2, Check, FileBox, Sliders, Ruler, FileText, AlertTriangle, Scale, Box, PenTool } from "lucide-react";
 import { WizardShell } from "./WizardShell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,7 @@ const STEPS = [
 
 const ALLOWED_MODEL_EXT = [".stl", ".step", ".stp", ".3mf", ".obj"];
 const ALLOWED_PDF_EXT = [".pdf"];
+const ALLOWED_DISENO_EXT = [".pdf", ".jpg", ".jpeg", ".png"];
 type FuenteDefinitiva = "modelo_3d" | "plano_2d";
 
 function DropZone({
@@ -117,7 +118,7 @@ function DropZone({
             Quitar archivo
           </span>
         ) : (
-          <p className="text-[11px] font-mono text-zinc-600">Máx 50MB (modelo) · 20MB (PDF)</p>
+          <p className="text-[11px] font-mono text-zinc-600">Máx 50MB (modelo) · 20MB (PDF/imagen)</p>
         )}
       </div>
     </div>
@@ -141,6 +142,7 @@ export function ProfesionalWizard() {
     : materialesFallback;
 
   const [step, setStep] = useState(1);
+  const [serviceType, setServiceType] = useState<'impresion' | 'diseno'>('impresion');
   const [modelo3d, setModelo3d] = useState<File | null>(null);
   const [planoPdf, setPlanoPdf] = useState<File | null>(null);
   const [fuenteDefinitiva, setFuenteDefinitiva] = useState<FuenteDefinitiva>("modelo_3d");
@@ -159,9 +161,14 @@ export function ProfesionalWizard() {
   // Material efectivo: si llega el fetch dinámico y el material actual ya no existe, usa el primero de la lista
   const selectedMaterial = materiales.length > 0 && !materiales.some((m) => m.id === material) ? materiales[0].id : material;
 
+  const isImpresion = serviceType === 'impresion';
+  const isDiseno = serviceType === 'diseno';
   const hasPdf = planoPdf !== null;
   const fileOk = modelo3d !== null || link.trim().length > 8;
-  const paso1Ok = fileOk && nda === true && (!hasPdf || (fuenteDefinitiva === "modelo_3d" || fuenteDefinitiva === "plano_2d"));
+  // Validación dinámica por bifurcación
+  const paso1Ok = isImpresion
+    ? (fileOk && nda === true && (!hasPdf || (fuenteDefinitiva === "modelo_3d" || fuenteDefinitiva === "plano_2d")))
+    : hasPdf; // diseno: plano/imagen obligatorio, sin NDA ni modelo
   const paso2Ok = Boolean(selectedMaterial && densidad && tolerancia);
   // Email opcional (Zod: z.string().email().optional().or(z.literal(''))) — solo WhatsApp obligatorio
   const isEmailOptionalValid = (v: string) => v.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
@@ -191,17 +198,35 @@ export function ProfesionalWizard() {
 
   const handlePdfFile = (f: File) => {
     const ext = "." + (f.name.split(".").pop()?.toLowerCase() ?? "");
-    if (!ALLOWED_PDF_EXT.includes(ext)) {
-      setError(`Plano: solo .pdf (recibido ${ext})`);
-      return;
-    }
-    if (f.type && f.type !== "application/pdf") {
-      setError("El plano debe ser PDF (application/pdf)");
-      return;
-    }
-    if (f.size > 20 * 1024 * 1024) {
-      setError("PDF excede 20MB (límite lógico)");
-      return;
+    // Bifurcación: validación dinámica
+    if (isDiseno) {
+      if (!ALLOWED_DISENO_EXT.includes(ext)) {
+        setError(`Referencia: extensión ${ext} no permitida. Usa ${ALLOWED_DISENO_EXT.join(", ")} (JPG, PNG, PDF)`);
+        return;
+      }
+      // validación mime esperada
+      const allowedMime = ["image/jpeg", "image/png", "application/pdf"];
+      if (f.type && !allowedMime.includes(f.type) && !f.type.startsWith("image/")) {
+        // Permitir image/* genérico pero advertir si no es alguno de los tres principales
+        // No bloqueamos duro si es image/xxx
+      }
+      if (f.size > 20 * 1024 * 1024) {
+        setError("Archivo excede 20MB (límite para plano/imagen)");
+        return;
+      }
+    } else {
+      if (!ALLOWED_PDF_EXT.includes(ext)) {
+        setError(`Plano: solo .pdf (recibido ${ext})`);
+        return;
+      }
+      if (f.type && f.type !== "application/pdf") {
+        setError("El plano debe ser PDF (application/pdf)");
+        return;
+      }
+      if (f.size > 20 * 1024 * 1024) {
+        setError("PDF excede 20MB (límite lógico)");
+        return;
+      }
     }
     setError("");
     setPlanoPdf(f);
@@ -212,6 +237,7 @@ export function ProfesionalWizard() {
    * 1. upload modelo 3D (y plano si existe) a bucket PRIVADO pro-vault con nombre b2b_<uuid>.ext
    * 2. obtener rutas internas (pro-vault/modelos/b2b_...stl) — solo accesible con RLS + signedUrl
    * 3. INSERT en solicitudes con tipo_pedido='profesional' y metadata + rutas
+   * BIFURCACIÓN: diseno => solo plano/imagen obligatorio, modelo_url = null, requiere_diseno = true
    */
   const handleSubmit = async () => {
     if (!paso1Ok || !paso2Ok || !paso3Ok) {
@@ -225,25 +251,37 @@ export function ProfesionalWizard() {
       let modeloPath: string | null = null;
       let planoPath: string | null = null;
 
-      // 1) SUBIDA SEGURA al bucket PRIVADO pro-vault (ofuscado)
-      if (modelo3d) {
-        const res = await uploaderModel.upload(modelo3d, { bucket: "pro-vault", prefix: "b2b", maxSizeMB: 50 });
-        modeloPath = res.path; // ej: pro-vault/modelos/b2b_...stl
-        enlaceArchivo = modeloPath;
-      }
-      if (planoPdf) {
+      // BIFURCACIÓN DE SUBIDA
+      if (isImpresion) {
+        // 1) SUBIDA SEGURA al bucket PRIVADO pro-vault (ofuscado) — Solo Impresión
+        if (modelo3d) {
+          const res = await uploaderModel.upload(modelo3d, { bucket: "pro-vault", prefix: "b2b", maxSizeMB: 50 });
+          modeloPath = res.path; // ej: pro-vault/modelos/b2b_...stl
+          enlaceArchivo = modeloPath;
+        }
+        if (planoPdf) {
+          const resPdf = await uploaderPdf.upload(planoPdf, { bucket: "pro-vault", prefix: "b2b", maxSizeMB: 20 });
+          planoPath = resPdf.path; // ej: pro-vault/planos/b2b_...pdf
+        }
+        if (!enlaceArchivo) throw new Error("Debes subir el Modelo 3D o pegar un link");
+      } else {
+        // Servicio de Diseño CAD: solo referencia (imagen/pdf) obligatoria
+        if (!planoPdf) throw new Error("Debes subir fotos, planos o bocetos para el servicio de diseño CAD");
         const resPdf = await uploaderPdf.upload(planoPdf, { bucket: "pro-vault", prefix: "b2b", maxSizeMB: 20 });
-        planoPath = resPdf.path; // ej: pro-vault/planos/b2b_...pdf
+        planoPath = resPdf.path; // ej: pro-vault/planos/b2b_...jpg o .pdf
+        enlaceArchivo = planoPath;
+        modeloPath = null; // explícitamente NULL permitido
+        if (!enlaceArchivo) throw new Error("Debes subir la referencia para diseño");
       }
 
-      if (!enlaceArchivo) throw new Error("Debes subir el Modelo 3D o pegar un link");
-
-      const requiereAuditoria = hasPdf && fuenteDefinitiva === "plano_2d";
+      const requiereAuditoria = isImpresion && hasPdf && fuenteDefinitiva === "plano_2d";
+      const requiereDiseno = isDiseno;
       const emailNorm = email.trim() === "" ? null : email.trim(); // opcional: "" -> null para no romper esquema
       const nombreProfesional = empresa.trim(); // para columna `nombre` (empresa es el nombre del cliente B2B)
       const metadata: Record<string, unknown> = {
+        requiere_diseno: requiereDiseno,
         tolerancia,
-        nda_aceptado: nda,
+        nda_aceptado: isImpresion ? nda : false,
         material_tecnico: selectedMaterial,
         densidad_relleno: densidad,
         empresa: empresa.trim(),
@@ -251,12 +289,12 @@ export function ProfesionalWizard() {
         ...(emailNorm ? { email: emailNorm } : {}),
         telefono: telefono.trim(),
         nota: nota.trim() || undefined,
-        tiene_plano_2d: hasPdf,
-        fuente_definitiva: hasPdf ? fuenteDefinitiva : undefined,
+        tiene_plano_2d: isImpresion ? hasPdf : true,
+        fuente_definitiva: isImpresion && hasPdf ? fuenteDefinitiva : undefined,
         requiere_auditoria_manual: requiereAuditoria,
         costo_auditoria: requiereAuditoria ? 100 : 0,
-        responsabilidad: hasPdf ? (fuenteDefinitiva === "modelo_3d" ? "cliente_asume_modelo_3d" : "auditoria_manual_solicitada") : "solo_modelo_3d",
-        ...(modeloPath ? { modelo_url: modeloPath } : {}),
+        responsabilidad: isDiseno ? "requiere_diseno_cad" : hasPdf ? (fuenteDefinitiva === "modelo_3d" ? "cliente_asume_modelo_3d" : "auditoria_manual_solicitada") : "solo_modelo_3d",
+        modelo_url: modeloPath, // NULL permitido en modo diseno
         ...(planoPath ? { plano_url: planoPath } : {}),
       };
 
@@ -282,7 +320,7 @@ export function ProfesionalWizard() {
         if (!res.ok) throw new Error(insertError.message);
       }
 
-      toast({ title: "Solicitud profesional enviada", description: "Recibirás tu cotización en tu correo en menos de 4h.", variant: "success" });
+      toast({ title: "Solicitud profesional enviada", description: requiereDiseno ? "Solicitud de diseño CAD enviada. El costo de modelado se añadirá a tu cotización." : "Recibirás tu cotización en tu correo en menos de 4h.", variant: "success" });
       router.push("/cotizar/exito");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado");
@@ -306,10 +344,45 @@ export function ProfesionalWizard() {
       onSubmit={handleSubmit}
       isSubmitting={submitting || isUploading}
       nextLabel="Siguiente: Parámetros"
-      submitLabel={isUploading ? `Subiendo a pro-vault ${Math.max(uploaderModel.progress, uploaderPdf.progress)}%...` : hasPdf && fuenteDefinitiva === "plano_2d" ? "Solicitar con auditoría (+Bs 100)" : "Solicitar cotización"}
+      submitLabel={isUploading ? `Subiendo a pro-vault ${Math.max(uploaderModel.progress, uploaderPdf.progress)}%...` : isDiseno ? "Solicitar cotización con diseño" : hasPdf && fuenteDefinitiva === "plano_2d" ? "Solicitar con auditoría (+Bs 100)" : "Solicitar cotización"}
     >
       {step === 1 && (
         <div className="space-y-6">
+          {/* SELECTOR BIFURCACIÓN */}
+          <div className="space-y-3">
+            <p className="text-xs font-mono font-bold tracking-widest uppercase text-zinc-400">Tipo de servicio *</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => { setServiceType('impresion'); setError(""); }}
+                className={`relative flex gap-3 rounded-2xl border-2 p-4 text-left transition-all ${isImpresion ? "border-orange-500 bg-orange-500/10" : "border-zinc-700 bg-zinc-900 hover:border-zinc-600"}`}
+              >
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${isImpresion ? "bg-orange-500 text-white" : "bg-zinc-800 text-zinc-400"}`}>
+                  <Box className="h-5 w-5" />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <p className={`text-sm font-mono font-bold leading-tight ${isImpresion ? "text-white" : "text-zinc-300"}`}>Ya tengo mi archivo 3D (STL/STEP)</p>
+                  <p className="text-xs text-zinc-500">Solo Impresión</p>
+                </div>
+                {isImpresion && <Check className="h-5 w-5 text-orange-500 shrink-0 mt-1" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setServiceType('diseno'); setError(""); }}
+                className={`relative flex gap-3 rounded-2xl border-2 p-4 text-left transition-all ${isDiseno ? "border-orange-500 bg-orange-500/10" : "border-zinc-700 bg-zinc-900 hover:border-zinc-600"}`}
+              >
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${isDiseno ? "bg-orange-500 text-white" : "bg-zinc-800 text-zinc-400"}`}>
+                  <PenTool className="h-5 w-5" />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <p className={`text-sm font-mono font-bold leading-tight ${isDiseno ? "text-white" : "text-zinc-300"}`}>Necesito servicio de diseño 3D</p>
+                  <p className="text-xs text-zinc-500">Modelado CAD</p>
+                </div>
+                {isDiseno && <Check className="h-5 w-5 text-orange-500 shrink-0 mt-1" />}
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <h2 className="text-lg font-mono font-bold tracking-tight text-white flex items-center gap-2">
@@ -320,92 +393,123 @@ export function ProfesionalWizard() {
             <span className="bg-orange-500/15 text-orange-500 border border-orange-500/20 font-mono text-[10px] px-2.5 py-1 rounded-full">ENCRYPTED</span>
           </div>
 
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex gap-3">
-            <Shield className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="text-xs font-mono font-bold text-amber-400 tracking-widest uppercase">Acuerdo de Confidencialidad (NDA) — Obligatorio *</p>
-              <p className="text-xs text-amber-200/80 leading-relaxed">
-                Tus archivos son confidenciales y se usan solo para tu cotización. Eliminación automática en 30 días.
-              </p>
-              <label className="flex items-center gap-2 pt-1 cursor-pointer">
-                <input type="checkbox" checked={nda} onChange={(e) => setNda(e.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-orange-500 accent-orange-500" />
-                <span className="text-xs font-mono text-zinc-300">Acepto el Acuerdo de Confidencialidad (NDA) *</span>
-              </label>
-              {!nda && <p className="text-xs font-mono text-amber-400">Debes aceptar el NDA para enviar.</p>}
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <DropZone
-              title="Modelo 3D"
-              subtitle="STL, STEP, 3MF, OBJ"
-              accept=".stl,.step,.stp,.3mf,.obj"
-              file={modelo3d}
-              required
-              onFile={handleModeloFile}
-              onClear={() => setModelo3d(null)}
-              icon={FileBox}
-              draggingLabel="Suelta el Modelo 3D aquí"
-              isUploading={uploaderModel.isUploading}
-              progress={uploaderModel.progress}
-            />
-            <DropZone
-              title="Plano Técnico (PDF)"
-              subtitle="PDF 2D — cotas, tolerancias (opcional)"
-              accept=".pdf,application/pdf"
-              file={planoPdf}
-              onFile={handlePdfFile}
-              onClear={() => setPlanoPdf(null)}
-              icon={FileText}
-              draggingLabel="Suelta el PDF aquí"
-              isUploading={uploaderPdf.isUploading}
-              progress={uploaderPdf.progress}
-            />
-          </div>
-          <p className="text-xs font-mono text-zinc-500">Formatos: STL, STEP, 3MF, OBJ y PDF · Hasta 50MB</p>
-
-          {!modelo3d && (
-            <>
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-zinc-700" />
-                <span className="text-xs font-mono text-zinc-500 tracking-widest uppercase">o link privado</span>
-                <div className="h-px flex-1 bg-zinc-700" />
+          {isImpresion && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex gap-3">
+              <Shield className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-xs font-mono font-bold text-amber-400 tracking-widest uppercase">Acuerdo de Confidencialidad (NDA) — Obligatorio *</p>
+                <p className="text-xs text-amber-200/80 leading-relaxed">
+                  Tus archivos son confidenciales y se usan solo para tu cotización. Eliminación automática en 30 días.
+                </p>
+                <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                  <input type="checkbox" checked={nda} onChange={(e) => setNda(e.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-orange-500 accent-orange-500" />
+                  <span className="text-xs font-mono text-zinc-300">Acepto el Acuerdo de Confidencialidad (NDA) *</span>
+                </label>
+                {!nda && <p className="text-xs font-mono text-amber-400">Debes aceptar el NDA para enviar.</p>}
               </div>
-              <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://drive.google.com/...  o  https://tu-cdn.com/modelo.step" className="h-11 rounded-xl font-mono text-sm" />
+            </div>
+          )}
+
+          {isImpresion ? (
+            <>
+              <div className="grid md:grid-cols-2 gap-4">
+                <DropZone
+                  title="Modelo 3D"
+                  subtitle="STL, STEP, 3MF, OBJ"
+                  accept=".stl,.step,.stp,.3mf,.obj"
+                  file={modelo3d}
+                  required
+                  onFile={handleModeloFile}
+                  onClear={() => setModelo3d(null)}
+                  icon={FileBox}
+                  draggingLabel="Suelta el Modelo 3D aquí"
+                  isUploading={uploaderModel.isUploading}
+                  progress={uploaderModel.progress}
+                />
+                <DropZone
+                  title="Plano Técnico (PDF)"
+                  subtitle="PDF 2D — cotas, tolerancias (opcional)"
+                  accept=".pdf,application/pdf"
+                  file={planoPdf}
+                  onFile={handlePdfFile}
+                  onClear={() => setPlanoPdf(null)}
+                  icon={FileText}
+                  draggingLabel="Suelta el PDF aquí"
+                  isUploading={uploaderPdf.isUploading}
+                  progress={uploaderPdf.progress}
+                />
+              </div>
+              <p className="text-xs font-mono text-zinc-500">Formatos: STL, STEP, 3MF, OBJ y PDF · Hasta 50MB (modelo) · 20MB (PDF)</p>
+
+              {!modelo3d && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-zinc-700" />
+                    <span className="text-xs font-mono text-zinc-500 tracking-widest uppercase">o link privado</span>
+                    <div className="h-px flex-1 bg-zinc-700" />
+                  </div>
+                  <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://drive.google.com/...  o  https://tu-cdn.com/modelo.step" className="h-11 rounded-xl font-mono text-sm" />
+                </>
+              )}
+
+              {hasPdf && (
+                <div className="rounded-2xl border-2 border-amber-500/40 bg-amber-500/5 p-5 space-y-4 animate-in fade-in">
+                  <div className="flex gap-3">
+                    <Scale className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-mono font-bold text-amber-400">En caso de discrepancia, ¿cuál archivo manda?</p>
+                      <p className="text-xs font-mono text-zinc-500">Elige la referencia definitiva para tu pieza</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3">
+                    <label className={`flex gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all ${fuenteDefinitiva === "modelo_3d" ? "border-emerald-500 bg-emerald-500/10" : "border-zinc-700 bg-zinc-900 hover:border-zinc-600"}`}>
+                      <input type="radio" name="fuente_definitiva" value="modelo_3d" checked={fuenteDefinitiva === "modelo_3d"} onChange={() => setFuenteDefinitiva("modelo_3d")} className="mt-1 h-4 w-4 accent-emerald-500" />
+                      <div className="flex-1 space-y-1">
+                        <p className={`text-sm font-mono font-bold ${fuenteDefinitiva === "modelo_3d" ? "text-emerald-400" : "text-zinc-300"}`}>El Modelo 3D manda (Imprimir tal cual)</p>
+                        <p className="text-xs text-zinc-500">PDF referencia · Sin costo extra</p>
+                      </div>
+                      {fuenteDefinitiva === "modelo_3d" && <Check className="h-5 w-5 text-emerald-500 shrink-0" />}
+                    </label>
+                    <label className={`flex gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all ${fuenteDefinitiva === "plano_2d" ? "border-amber-500 bg-amber-500/10" : "border-zinc-700 bg-zinc-900 hover:border-zinc-600"}`}>
+                      <input type="radio" name="fuente_definitiva" value="plano_2d" checked={fuenteDefinitiva === "plano_2d"} onChange={() => setFuenteDefinitiva("plano_2d")} className="mt-1 h-4 w-4 accent-amber-500" />
+                      <div className="flex-1 space-y-1">
+                        <p className={`text-sm font-mono font-bold ${fuenteDefinitiva === "plano_2d" ? "text-amber-400" : "text-zinc-300"}`}>El Plano 2D manda (Requiere auditoría manual — +Bs 100)</p>
+                        <p className="text-xs text-zinc-500">Auditamos STL vs PDF · +Bs 100</p>
+                      </div>
+                      {fuenteDefinitiva === "plano_2d" && <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />}
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {!fileOk && <p className="text-xs font-mono text-amber-400">Sube el Modelo 3D o pega un link para continuar.</p>}
+            </>
+          ) : (
+            <>
+              <DropZone
+                title="Plano Técnico / Referencia CAD"
+                subtitle="Sube fotos de la pieza a replicar, planos o bocetos a mano con medidas."
+                accept="image/jpeg, image/png, application/pdf,.jpg,.jpeg,.png,.pdf"
+                file={planoPdf}
+                required
+                onFile={handlePdfFile}
+                onClear={() => setPlanoPdf(null)}
+                icon={PenTool}
+                draggingLabel="Suelta tus fotos/planos aquí"
+                isUploading={uploaderPdf.isUploading}
+                progress={uploaderPdf.progress}
+              />
+              <p className="text-xs font-mono text-zinc-400">Formatos: JPG, PNG, PDF · Máx 20MB · Fotos nítidas con medidas facilitan el modelado</p>
+              <div className="rounded-xl border border-orange-500/30 bg-orange-500/10 p-4 flex gap-3">
+                <AlertTriangle className="h-5 w-5 text-orange-400 shrink-0 mt-0.5" />
+                <p className="text-xs font-mono text-orange-200/90 leading-relaxed">
+                  <span className="font-bold text-orange-400">Aviso:</span> El servicio de modelado CAD tiene un costo por hora de ingeniería que se añadirá a tu cotización.
+                </p>
+              </div>
+              {!hasPdf && <p className="text-xs font-mono text-amber-400">Sube fotos, planos o bocetos para continuar con el servicio de diseño.</p>}
             </>
           )}
 
-          {hasPdf && (
-            <div className="rounded-2xl border-2 border-amber-500/40 bg-amber-500/5 p-5 space-y-4 animate-in fade-in">
-              <div className="flex gap-3">
-                <Scale className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-sm font-mono font-bold text-amber-400">En caso de discrepancia, ¿cuál archivo manda?</p>
-                  <p className="text-xs font-mono text-zinc-500">Elige la referencia definitiva para tu pieza</p>
-                </div>
-              </div>
-              <div className="grid gap-3">
-                <label className={`flex gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all ${fuenteDefinitiva === "modelo_3d" ? "border-emerald-500 bg-emerald-500/10" : "border-zinc-700 bg-zinc-900 hover:border-zinc-600"}`}>
-                  <input type="radio" name="fuente_definitiva" value="modelo_3d" checked={fuenteDefinitiva === "modelo_3d"} onChange={() => setFuenteDefinitiva("modelo_3d")} className="mt-1 h-4 w-4 accent-emerald-500" />
-                  <div className="flex-1 space-y-1">
-                    <p className={`text-sm font-mono font-bold ${fuenteDefinitiva === "modelo_3d" ? "text-emerald-400" : "text-zinc-300"}`}>El Modelo 3D manda (Imprimir tal cual)</p>
-                    <p className="text-xs text-zinc-500">PDF referencia · Sin costo extra</p>
-                  </div>
-                  {fuenteDefinitiva === "modelo_3d" && <Check className="h-5 w-5 text-emerald-500 shrink-0" />}
-                </label>
-                <label className={`flex gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all ${fuenteDefinitiva === "plano_2d" ? "border-amber-500 bg-amber-500/10" : "border-zinc-700 bg-zinc-900 hover:border-zinc-600"}`}>
-                  <input type="radio" name="fuente_definitiva" value="plano_2d" checked={fuenteDefinitiva === "plano_2d"} onChange={() => setFuenteDefinitiva("plano_2d")} className="mt-1 h-4 w-4 accent-amber-500" />
-                  <div className="flex-1 space-y-1">
-                    <p className={`text-sm font-mono font-bold ${fuenteDefinitiva === "plano_2d" ? "text-amber-400" : "text-zinc-300"}`}>El Plano 2D manda (Requiere auditoría manual — +Bs 100)</p>
-                    <p className="text-xs text-zinc-500">Auditamos STL vs PDF · +Bs 100</p>
-                  </div>
-                  {fuenteDefinitiva === "plano_2d" && <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />}
-                </label>
-              </div>
-            </div>
-          )}
-
-          {!fileOk && <p className="text-xs font-mono text-amber-400">Sube el Modelo 3D o pega un link para continuar.</p>}
           {(uploaderModel.error || uploaderPdf.error) && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{uploaderModel.error || uploaderPdf.error}</p>}
           {error && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</p>}
         </div>
@@ -511,9 +615,19 @@ export function ProfesionalWizard() {
           </label>
           <div className="rounded-xl bg-zinc-900 border border-zinc-700 p-4 space-y-2 font-mono text-xs">
             <p className="font-bold text-zinc-300 tracking-widest uppercase">Resumen</p>
-            <p className="text-zinc-500">Archivo: <span className="text-zinc-200 break-all">{modelo3d ? `${modelo3d.name} → pro-vault` : link || "—"}</span></p>
-            {hasPdf && <p className="text-zinc-500">Plano: <span className="text-zinc-200 break-all">{planoPdf!.name} → pro-vault</span></p>}
-            <p className="text-zinc-500">NDA: <span className="text-emerald-400">{nda ? "Aceptado ✓" : "Pendiente"}</span></p>
+            <p className="text-zinc-500">Servicio: <span className="text-orange-400">{isDiseno ? "Diseño CAD + Impresión" : "Solo Impresión"}</span></p>
+            {isImpresion ? (
+              <>
+                <p className="text-zinc-500">Archivo: <span className="text-zinc-200 break-all">{modelo3d ? `${modelo3d.name} → pro-vault` : link || "—"}</span></p>
+                {hasPdf && <p className="text-zinc-500">Plano: <span className="text-zinc-200 break-all">{planoPdf!.name} → pro-vault</span></p>}
+                <p className="text-zinc-500">NDA: <span className="text-emerald-400">{nda ? "Aceptado ✓" : "Pendiente"}</span></p>
+              </>
+            ) : (
+              <>
+                <p className="text-zinc-500">Referencia diseño: <span className="text-zinc-200 break-all">{planoPdf ? `${planoPdf.name} → pro-vault (requiere_diseno)` : "—"}</span></p>
+                <p className="text-amber-400">+ Costo hora ingeniería CAD se añadirá</p>
+              </>
+            )}
           </div>
           {!paso3Ok && <p className="text-xs font-mono text-zinc-500 text-right">Completa empresa y WhatsApp (8+ dígitos). Email es opcional.</p>}
           {error && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</p>}
