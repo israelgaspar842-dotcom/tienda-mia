@@ -44,6 +44,9 @@ const ALLOWED_PDF_EXT = [".pdf"];
 const ALLOWED_DISENO_EXT = [".pdf", ".jpg", ".jpeg", ".png"];
 type FuenteDefinitiva = "modelo_3d" | "plano_2d";
 
+// Panel admin para las alertas de Discord (env con fallback al dominio de producción)
+const ADMIN_PANEL_URL = `${process.env.NEXT_PUBLIC_SITE_URL || "https://inventov3d.vercel.app"}/admin`;
+
 function DropZone({
   title,
   subtitle,
@@ -301,37 +304,25 @@ export function ProfesionalWizard() {
 
       // 2) INSERT con rutas internas (no URL pública, bucket privado) + telefono y nombre para wa.me y Kanban
       // ENVÍO SEGURO: email vacío se omite/null para no lanzar error de esquema
-      // Captura ID para Deep Link seguro al panel admin (sin exponer URL física - NDA)
+      // INSERT — la alerta Discord apunta al panel admin (sin exponer rutas físicas de pro-vault)
       const supabase = createClient();
-      const { data: insertedData, error: insertError } = await supabase
-        .from("solicitudes")
-        .insert({
-          enlace_archivo: enlaceArchivo,
-          tipo_pedido: "profesional",
-          estado: "Pendiente",
-          telefono: telefono.trim() || null,
-          nombre: nombreProfesional || null,
-          metadata,
-        })
-        .select("id")
-        .single();
-
-      let solicitudId: string | null = (insertedData as { id?: string } | null)?.id ?? null;
+      const { error: insertError } = await supabase.from("solicitudes").insert({
+        enlace_archivo: enlaceArchivo,
+        tipo_pedido: "profesional",
+        estado: "Pendiente",
+        telefono: telefono.trim() || null,
+        nombre: nombreProfesional || null,
+        metadata,
+      });
 
       if (insertError) {
-        // fallback dev sin tabla supabase — captura ID del endpoint
+        // fallback dev sin tabla supabase
         const res = await fetch("/api/solicitudes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enlace_archivo: enlaceArchivo, tipo_pedido: "profesional", telefono: telefono.trim(), nombre: nombreProfesional, metadata }),
         });
         if (!res.ok) throw new Error(insertError.message);
-        try {
-          const fallbackData = (await res.json()) as { id?: string };
-          if (fallbackData?.id) solicitudId = String(fallbackData.id);
-        } catch {
-          // ignore parse error, solicitudId quedará null
-        }
       }
 
       toast({ title: "Solicitud profesional enviada", description: requiereDiseno ? "Solicitud de diseño CAD enviada. El costo de modelado se añadirá a tu cotización." : "Recibirás tu cotización en tu correo en menos de 4h.", variant: "success" });
@@ -353,9 +344,7 @@ export function ProfesionalWizard() {
               { name: "📂 Archivo Principal", value: urlDelArchivoSubido ? `[📥 Descargar Archivo / Ver Imagen](${urlDelArchivoSubido})` : "Sin archivo adjunto", inline: false },
               {
                 name: "Acción Rápida",
-                value: solicitudId
-                  ? `[🔗 Ver Archivos y Evaluar Ticket](https://inventov3d.vercel.app/admin/solicitudes/${solicitudId})`
-                  : "ID no disponible — revisar panel admin",
+                value: `[🔗 Abrir Panel de Control (Kanban)](${ADMIN_PANEL_URL})`,
                 inline: false
               }
             ]

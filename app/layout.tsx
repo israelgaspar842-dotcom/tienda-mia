@@ -15,19 +15,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "INVENTOV — Materializar ideas con precisión",
-  description: "Impresión 3D profesional. Cotiza regalos y prototipos de ingeniería.",
+  metadataBase: new URL("https://inventov3d.vercel.app"),
+  title: "INVENTOV — Impresión 3D",
+  description: "Impresión 3D bajo demanda. Desde prototipos hasta series cortas.",
   openGraph: {
-    title: "INVENTOV — Impresión 3D",
-    description: "Impresión 3D bajo demanda. Desde prototipos hasta series cortas.",
+    title: "INVENTOV — Impresión 3D y Prototipado",
+    description: "Materializa tus ideas con nuestro servicio de manufactura y diseño CAD.",
     url: "https://inventov3d.vercel.app",
     siteName: "INVENTOV",
     images: [
       {
-        url: "/og-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "INVENTOV Portada",
+        url: "/imagenes/logo-social.jpg",
+        width: 1024,
+        height: 1024,
+        alt: "INVENTOV Impresión 3D Logo",
       },
     ],
     locale: "es_BO",

@@ -96,6 +96,12 @@ export default function EditProjectModal({ project, open, onClose, onSaved }: Pr
     if (!titulo.trim() || titulo.length < 2) return setError("Título mínimo 2 caracteres");
     if (!descripcion.trim() || descripcion.length < 10) return setError("Descripción mínimo 10 caracteres");
 
+    // Bloqueo estricto: el proyecto debe conservar al menos una foto (existentes o nuevas a subir)
+    if (currentGallery.length + files.length < 1) {
+      alert("El proyecto debe tener al menos una foto.");
+      return;
+    }
+
     setUploading(true);
     setProgress(10);
     const supabase = createClient();
@@ -147,7 +153,13 @@ export default function EditProjectModal({ project, open, onClose, onSaved }: Pr
       // ACTUALIZAR TABLA: guardando el arreglo currentGallery (ya filtrado) + nuevas fotos
       const { data: updated, error: updateError } = await supabase
         .from("portfolio")
-        .update({ titulo: titulo.trim(), descripcion: descripcion.trim(), galeria: newGaleria })
+        .update({
+          titulo: titulo.trim(),
+          descripcion: descripcion.trim(),
+          galeria: newGaleria,
+          // Portada = primera foto sobreviviente. Nunca confiar en el valor viejo.
+          imagen_url: newGaleria[0] ?? project.imagen_url,
+        })
         .eq("id", project.id)
         .select()
         .single();

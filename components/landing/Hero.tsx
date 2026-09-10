@@ -13,7 +13,7 @@ type HeroProject = {
 
 export async function Hero() {
   // EXTRACCIÓN (Server Component) — consulta requerida:
-  // SELECT id, titulo, descripcion, imagen_url FROM portfolio WHERE es_destacado = true ORDER BY created_at DESC LIMIT 4
+  // SELECT id, titulo, descripcion, imagen_url FROM portfolio WHERE es_destacado = true ORDER BY created_at DESC LIMIT 8
   let proyectos: HeroProject[] = [];
   try {
     const supabase = await createServerSupabaseClient();
@@ -22,7 +22,7 @@ export async function Hero() {
       .select("id, titulo, descripcion, imagen_url")
       .eq("es_destacado", true)
       .order("created_at", { ascending: false })
-      .limit(4);
+      .limit(8);
     if (!error && data) {
       proyectos = (data as HeroProject[]).map((row) => ({
         id: String((row as Record<string, unknown>)["id"]),

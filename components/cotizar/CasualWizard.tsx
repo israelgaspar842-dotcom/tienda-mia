@@ -18,6 +18,9 @@ const STEPS = [
   { id: 3, label: "Contacto", icon: User },
 ];
 
+// Panel admin para las alertas de Discord (env con fallback al dominio de producción)
+const ADMIN_PANEL_URL = `${process.env.NEXT_PUBLIC_SITE_URL || "https://inventov3d.vercel.app"}/admin`;
+
 function isValidUrl(v: string) {
   if (!v.trim()) return false;
   try {
@@ -185,7 +188,8 @@ export function CasualWizard() {
               { name: "Origen", value: "Formulario de la página web", inline: true },
               { name: "Email / Contacto", value: email || "No especificado", inline: true },
               { name: "Servicio / Detalle", value: nota ? nota.substring(0, 100) + '...' : "Impresión 3D estándar", inline: false },
-              { name: "📂 Archivo Principal", value: urlDelArchivoSubido ? `[📥 Descargar Archivo / Ver Imagen](${urlDelArchivoSubido})` : "Sin archivo adjunto", inline: false }
+              { name: "📂 Archivo Principal", value: urlDelArchivoSubido ? `[📥 Descargar Archivo / Ver Imagen](${urlDelArchivoSubido})` : "Sin archivo adjunto", inline: false },
+              { name: "Acción Rápida", value: `[🔗 Abrir Panel de Control (Kanban)](${ADMIN_PANEL_URL})`, inline: false }
             ]
           }]
         });

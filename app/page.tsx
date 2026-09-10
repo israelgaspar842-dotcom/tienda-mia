@@ -6,6 +6,8 @@ import { CtaBanner } from "@/components/landing/CtaBanner";
 import { Footer } from "@/components/landing/Footer";
 import { EducationalSection } from "@/components/landing/EducationalSection";
 
+export const revalidate = 60;
+
 export default function Home() {
   return (
     <>
