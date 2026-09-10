@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSupabaseUpload } from "@/lib/useSupabaseUpload";
 import { createClient } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/toaster";
+import { sendDiscordAlert } from "@/app/actions/notifyDiscord";
 
 const STEPS = [
   { id: 1, label: "Tu modelo", icon: Link2 },
@@ -116,10 +117,15 @@ export function CasualWizard() {
     setError("");
     try {
       let enlaceArchivo = enlace.trim() || "";
+      // Variable exacta con URL pública generada por Supabase para Discord
+      let publicUrlForDiscord: string | null = enlace.trim() || null;
 
       if (file) {
-        const { path } = await uploader.upload(file, { bucket: "casual-uploads", prefix: "casual", maxSizeMB: 5 });
+        const { path, publicUrl } = await uploader.upload(file, { bucket: "casual-uploads", prefix: "casual", maxSizeMB: 5 });
         enlaceArchivo = path;
+        publicUrlForDiscord = publicUrl || path;
+      } else if (enlaceArchivo) {
+        publicUrlForDiscord = enlaceArchivo;
       }
 
       if (!enlaceArchivo) throw new Error("Debes subir una imagen de referencia o pegar un enlace");
@@ -166,6 +172,29 @@ export function CasualWizard() {
         if (!res.ok) throw new Error(insertError.message);
       }
 
+      // 2. DISPARAR DISCORD EXPLICITAMENTE — payload enriquecido con enlaces directos a Supabase
+      console.log("Preparando alerta de Discord...");
+      try {
+        const urlDelArchivoSubido = publicUrlForDiscord;
+        await sendDiscordAlert({
+          content: "🚨 Tienes una nueva solicitud en cola.",
+          embeds: [{
+            title: "Nueva Cotización de INVENTOV",
+            color: 15277568,
+            fields: [
+              { name: "Origen", value: "Formulario de la página web", inline: true },
+              { name: "Email / Contacto", value: email || "No especificado", inline: true },
+              { name: "Servicio / Detalle", value: nota ? nota.substring(0, 100) + '...' : "Impresión 3D estándar", inline: false },
+              { name: "📂 Archivo Principal", value: urlDelArchivoSubido ? `[📥 Descargar Archivo / Ver Imagen](${urlDelArchivoSubido})` : "Sin archivo adjunto", inline: false }
+            ]
+          }]
+        });
+        console.log("Alerta de Discord procesada en el cliente.");
+      } catch (discordErr) {
+        console.error("Fallo al llamar a la Server Action de Discord:", discordErr);
+      }
+
+      // 3. AHORA SÍ, REDIRIGIR
       toast({ title: "¡Cotización enviada!", description: "Te responderemos en tu correo en menos de 2h.", variant: "success" });
       router.push("/cotizar/exito");
     } catch (e) {

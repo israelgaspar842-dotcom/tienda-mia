@@ -10,6 +10,7 @@ import { useSupabaseUpload } from "@/lib/useSupabaseUpload";
 import { createClient } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/toaster";
 import { useMateriales } from "@/lib/useMateriales";
+import { sendDiscordAlert } from "@/app/actions/notifyDiscord";
 
 const materialesFallback = [
   { id: "PLA", label: "PLA", desc: "Prototipos visuales, bajo costo", temp: "210°C" },
@@ -300,27 +301,72 @@ export function ProfesionalWizard() {
 
       // 2) INSERT con rutas internas (no URL pública, bucket privado) + telefono y nombre para wa.me y Kanban
       // ENVÍO SEGURO: email vacío se omite/null para no lanzar error de esquema
+      // Captura ID para Deep Link seguro al panel admin (sin exponer URL física - NDA)
       const supabase = createClient();
-      const { error: insertError } = await supabase.from("solicitudes").insert({
-        enlace_archivo: enlaceArchivo,
-        tipo_pedido: "profesional",
-        estado: "Pendiente",
-        telefono: telefono.trim() || null,
-        nombre: nombreProfesional || null,
-        metadata,
-      });
+      const { data: insertedData, error: insertError } = await supabase
+        .from("solicitudes")
+        .insert({
+          enlace_archivo: enlaceArchivo,
+          tipo_pedido: "profesional",
+          estado: "Pendiente",
+          telefono: telefono.trim() || null,
+          nombre: nombreProfesional || null,
+          metadata,
+        })
+        .select("id")
+        .single();
+
+      let solicitudId: string | null = (insertedData as { id?: string } | null)?.id ?? null;
 
       if (insertError) {
-        // fallback dev sin tabla supabase
+        // fallback dev sin tabla supabase — captura ID del endpoint
         const res = await fetch("/api/solicitudes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enlace_archivo: enlaceArchivo, tipo_pedido: "profesional", telefono: telefono.trim(), nombre: nombreProfesional, metadata }),
         });
         if (!res.ok) throw new Error(insertError.message);
+        try {
+          const fallbackData = (await res.json()) as { id?: string };
+          if (fallbackData?.id) solicitudId = String(fallbackData.id);
+        } catch {
+          // ignore parse error, solicitudId quedará null
+        }
       }
 
       toast({ title: "Solicitud profesional enviada", description: requiereDiseno ? "Solicitud de diseño CAD enviada. El costo de modelado se añadirá a tu cotización." : "Recibirás tu cotización en tu correo en menos de 4h.", variant: "success" });
+
+      // 2. DISPARAR DISCORD EXPLICITAMENTE — payload enriquecido con enlaces directos a Supabase (agilidad extrema)
+      console.log("Preparando alerta de Discord...");
+      try {
+        // Variable exacta con URL pública generada por Supabase (enlaceArchivo = pro-vault/... o link)
+        const urlDelArchivoSubido = enlaceArchivo;
+        await sendDiscordAlert({
+          content: "🚨 Tienes una nueva solicitud en cola.",
+          embeds: [{
+            title: "Nueva Cotización de INVENTOV",
+            color: 15277568,
+            fields: [
+              { name: "Origen", value: "Formulario de la página web", inline: true },
+              { name: "Email / Contacto", value: email || telefono || "No especificado", inline: true },
+              { name: "Servicio / Detalle", value: nota ? nota.substring(0, 100) + '...' : "Impresión 3D estándar", inline: false },
+              { name: "📂 Archivo Principal", value: urlDelArchivoSubido ? `[📥 Descargar Archivo / Ver Imagen](${urlDelArchivoSubido})` : "Sin archivo adjunto", inline: false },
+              {
+                name: "Acción Rápida",
+                value: solicitudId
+                  ? `[🔗 Ver Archivos y Evaluar Ticket](https://inventov3d.vercel.app/admin/solicitudes/${solicitudId})`
+                  : "ID no disponible — revisar panel admin",
+                inline: false
+              }
+            ]
+          }]
+        });
+        console.log("Alerta de Discord procesada en el cliente.");
+      } catch (discordErr) {
+        console.error("Fallo al llamar a la Server Action de Discord:", discordErr);
+      }
+
+      // 3. AHORA SÍ, REDIRIGIR
       router.push("/cotizar/exito");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado");

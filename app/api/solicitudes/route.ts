@@ -172,11 +172,13 @@ export async function POST(req: Request) {
     if (error) throw new Error(error.message);
 
     // ──────────────────────────────────────────────────────────────
-    // Notificación Discord en tiempo real (Fire and Forget) — no bloquea al cliente
+    // Notificación Discord en tiempo real — DEBUGGING
     // Requiere DISCORD_WEBHOOK_URL en .env.local
     // Ubicación: inmediatamente después del INSERT exitoso a solicitudes
+    // Logs para rastrear flujo y respuesta exacta de Discord
     // ──────────────────────────────────────────────────────────────
     try {
+      console.log("Verificando Webhook URL:", process.env.DISCORD_WEBHOOK_URL ? "URL Encontrada" : "URL FALTANTE");
       const webhookUrl = process.env.DISCORD_WEBHOOK_URL || process.env.WEBHOOK_URL;
       if (webhookUrl) {
         const meta = (metadata ?? {}) as Record<string, unknown>;
@@ -208,14 +210,22 @@ export async function POST(req: Request) {
           ],
         };
 
-        // Fire-and-forget: no await — no bloquea la respuesta al cliente si el webhook falla
-        void fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(discordPayload),
-        }).catch((err) => {
-          console.error("[discord webhook] fallo silencioso (no bloquea cliente):", err);
-        });
+        try {
+          const response = await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(discordPayload),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("🚨 Discord rechazó el mensaje. Código:", response.status, "Detalle:", errorText);
+          } else {
+            console.log("✅ Mensaje entregado a Discord con éxito");
+          }
+        } catch (error) {
+          console.error("💥 Error fatal al intentar conectar con Discord:", error);
+        }
       } else {
         console.warn(
           "[discord webhook] DISCORD_WEBHOOK_URL no configurada — añade DISCORD_WEBHOOK_URL en .env.local (Discord > Integraciones > Webhooks) para recibir alertas"
