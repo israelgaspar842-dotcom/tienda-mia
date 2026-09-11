@@ -89,7 +89,7 @@ function buildWhatsAppLink(s: Solicitud): { href: string | null; message: string
     ? `Color ${(meta["color"] as string) ?? "—"}, Acabado ${(meta["acabado"] as string) ?? "—"}`
     : `Tolerancia ${(meta["tolerancia"] as string) ?? "—"}, Material ${(meta["material_tecnico"] as string) ?? "—"}`;
 
-  const texto = `Hola! Soy de INVENTOV Sucre. He revisado tu solicitud de impresión 3D. El costo total de tu pieza (con características: ${caracteristicas}) es de Bs ${precio}. ¿Te parece bien si te envío los datos de pago para comenzar la producción hoy mismo?`;
+  const texto = `¡Hola! Soy de *INVENTOV Sucre*. 👋\nHe revisado tu solicitud de impresión 3D y el modelo está listo para fabricarse.\n\nDetalles de tu pieza:\n🔹 *Material:* ${(meta["material_tecnico"] as string) ?? (meta["material"] as string) ?? "—"}\n🔹 *Color:* ${(meta["color"] as string) ?? "—"}\n🔹 *Acabado:* ${(meta["acabado"] as string) ?? "—"}\n\nEl costo total de producción es de *Bs ${precio}*.\n\n¿Te envío los datos de pago por este medio para meter tu pieza a la máquina hoy mismo? ⚙️`;
   const href = `https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`;
   return { href, message: texto };
 }

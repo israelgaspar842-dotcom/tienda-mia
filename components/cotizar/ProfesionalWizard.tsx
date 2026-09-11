@@ -631,22 +631,22 @@ export function ProfesionalWizard() {
           <div className="grid md:grid-cols-2 gap-4">
             <label className="space-y-1.5">
               <span className="text-xs font-mono tracking-widest uppercase text-zinc-400">Empresa *</span>
-              <Input value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Ingeniería SpA" className="h-11 rounded-xl font-mono" />
+              <Input value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="" className="h-11 rounded-xl font-mono" />
             </label>
             <label className="space-y-1.5">
               <span className="text-xs font-mono tracking-widest uppercase text-zinc-400">Email <span className="text-zinc-500 font-normal">(opcional)</span></span>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="proyectos@empresa.cl (opcional)" type="email" className="h-11 rounded-xl font-mono" />
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="" type="email" className="h-11 rounded-xl font-mono" />
               {email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && <span className="text-xs font-mono text-amber-400">Email inválido — deja vacío si no quieres usarlo</span>}
               <span className="text-[11px] font-mono text-zinc-600">Opcional · WhatsApp es el contacto principal</span>
             </label>
           </div>
           <label className="space-y-1.5 block">
             <span className="text-xs font-mono tracking-widest uppercase text-zinc-400">Teléfono / WhatsApp *</span>
-            <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+591 73854684" className="h-11 rounded-xl font-mono" />
+            <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+591 " className="h-11 rounded-xl font-mono" />
           </label>
           <label className="space-y-1.5 block">
             <span className="text-xs font-mono tracking-widest uppercase text-zinc-400">Nota técnica (opcional)</span>
-            <Textarea value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej: Requiere insertos M3..." rows={3} className="rounded-xl font-mono" />
+            <Textarea value={nota} onChange={(e) => setNota(e.target.value)} placeholder="" rows={3} className="rounded-xl font-mono" />
           </label>
           <div className="rounded-xl bg-zinc-900 border border-zinc-700 p-4 space-y-2 font-mono text-xs">
             <p className="font-bold text-zinc-300 tracking-widest uppercase">Resumen</p>

@@ -367,12 +367,12 @@ export function CasualWizard() {
           <div className="grid md:grid-cols-2 gap-4">
             <label className="space-y-2">
               <span className="text-xs font-bold tracking-widest uppercase text-zinc-300">Tu nombre *</span>
-              <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Camila" className="h-11 rounded-2xl" />
+              <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="" className="h-11 rounded-2xl" />
               {nombre && nombre.trim().length < 2 && <span className="text-xs text-amber-400">Mín. 2 caracteres</span>}
             </label>
             <label className="space-y-2">
               <span className="text-xs font-bold tracking-widest uppercase text-zinc-300">Email <span className="text-zinc-500 font-normal normal-case">(opcional)</span></span>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="camila@email.com (opcional)" type="email" className="h-11 rounded-2xl" />
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="" type="email" className="h-11 rounded-2xl" />
               {email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && <span className="text-xs text-amber-400">Email inválido — deja vacío si no quieres usarlo</span>}
               <span className="text-[11px] text-zinc-500">Opcional · WhatsApp es el contacto principal</span>
             </label>
@@ -382,7 +382,7 @@ export function CasualWizard() {
             <Input
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
-              placeholder="+591 73854684"
+              placeholder="+591 "
               type="tel"
               inputMode="tel"
               autoComplete="tel"
@@ -394,7 +394,7 @@ export function CasualWizard() {
           </label>
           <label className="space-y-2 block">
             <span className="text-xs font-bold tracking-widest uppercase text-zinc-300">¿Algo más? (opcional)</span>
-            <Textarea value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej: Es para un regalo..." rows={3} className="rounded-2xl" />
+            <Textarea value={nota} onChange={(e) => setNota(e.target.value)} placeholder="" rows={3} className="rounded-2xl" />
           </label>
           <div className="rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 p-4 space-y-2">
             <p className="text-xs font-bold text-slate-900 dark:text-white">Resumen</p>

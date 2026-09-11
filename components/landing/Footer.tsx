@@ -60,20 +60,32 @@ export function Footer() {
 
           <div className="space-y-3">
             <p className="text-xs font-semibold tracking-wider text-slate-900 dark:text-white uppercase">Contacto directo</p>
-            <a
-              href="https://wa.me/59173854684"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-zinc-400 hover:text-orange-500 transition-colors"
-            >
-              <MessageCircle className="h-4 w-4" /> +591 73854684 — WhatsApp
-            </a>
-            <a
-              href="mailto:hola@inventov.cl"
-              className="flex items-center gap-2 text-sm text-slate-500 dark:text-zinc-400 hover:text-orange-500 transition-colors"
-            >
-              <Mail className="h-4 w-4" /> hola@inventov.cl
-            </a>
+            {/* Fila de WhatsApp Interactiva */}
+            <div className="flex items-center gap-3 text-gray-300 hover:text-[#25D366] transition-colors group">
+              <a 
+                href="https://wa.me/59173854684?text=Hola%20INVENTOV,%20vengo%20de%20la%20página%20web"
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 w-full"
+              >
+                <MessageCircle className="w-5 h-5 group-hover:scale-110 transition-transform"/>
+                <span className="underline-offset-4 group-hover:underline">
+                  +591 73854684
+                </span>
+              </a>
+            </div>
+            {/* Fila del Portafolio */}
+            <div className="flex items-center gap-3 text-gray-300 hover:text-white transition-colors">
+              <Globe className="w-5 h-5"/>
+              <a 
+                href="https://israelvelizgaspar.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="underline-offset-4 hover:underline"
+              >
+                Portafolio del Fundador
+              </a>
+            </div>
             <span className="flex items-center gap-2 text-sm text-slate-500 dark:text-zinc-400">
               <MapPin className="h-4 w-4" /> Sucre, Bolivia — Envíos a todo el país
             </span>
