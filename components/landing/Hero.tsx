@@ -3,6 +3,7 @@ import { Gift, Cog, ShieldCheck, Clock3, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { HeroCarousel } from "@/components/landing/HeroCarousel";
+import { CompatibleBanner } from "@/components/landing/CompatibleBanner";
 
 type HeroProject = {
   id: string;
@@ -149,21 +150,7 @@ export async function Hero() {
         </div>
       </div>
 
-      <div className="border-y border-slate-200 dark:border-neutral-800 bg-slate-100/50 dark:bg-neutral-900/50">
-        <div className="mx-auto max-w-7xl px-6 py-3 flex flex-wrap gap-6 items-center justify-between text-xs text-slate-500 dark:text-neutral-500">
-          <span className="font-semibold tracking-widest uppercase">Compatible con</span>
-          <div className="flex gap-6 font-bold tracking-wide">
-            <span>MakerWorld</span>
-            <span className="text-slate-300 dark:text-neutral-700">•</span>
-            <span>Thingiverse</span>
-            <span className="text-slate-300 dark:text-neutral-700">•</span>
-            <span>Printables</span>
-            <span className="text-slate-300 dark:text-neutral-700">•</span>
-            <span>Cults3D</span>
-          </div>
-          <span className="text-slate-400 dark:text-neutral-600">+1.200 piezas entregadas</span>
-        </div>
-      </div>
+      <CompatibleBanner />
     </section>
   );
 }
