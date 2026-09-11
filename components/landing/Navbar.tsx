@@ -27,15 +27,15 @@ export function Navbar() {
   const isPro = mode === "pro";
 
   const linksPro = [
-    { label: "Materiales de Ingeniería", href: "#materiales" },
-    { label: "Seguridad y NDA", href: "#seguridad" },
-    { label: "Portal Empresas", href: "#empresas" },
+    { label: "Materiales de Ingeniería", href: "/#materiales" },
+    { label: "Seguridad y NDA", href: "/#seguridad" },
+    { label: "Portal Empresas", href: "/#empresas" },
   ];
 
   const linksCasual = [
-    { label: "Galería de Regalos", href: "#portfolio" },
-    { label: "Cómo funciona", href: "#proceso" },
-    { label: "Rastrea tu pedido", href: "#rastreo" },
+    { label: "Galería de Regalos", href: "/#portfolio" },
+    { label: "Cómo funciona", href: "/#proceso" },
+    { label: "Rastrea tu pedido", href: "/#rastreo" },
   ];
 
   const links = isPro ? linksPro : linksCasual;
@@ -73,14 +73,20 @@ export function Navbar() {
         {/* Nav desktop — dinámica por modo */}
         <nav className="hidden md:flex items-center gap-1">
           {links.map((l) => (
-            <a
+            <Link
               key={l.label}
               href={l.href}
               className="px-3.5 py-2 text-sm font-medium text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-neutral-800"
             >
               {l.label}
-            </a>
+            </Link>
           ))}
+          <Link
+            href="/asesoria"
+            className="px-3.5 py-2 text-sm font-medium text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-neutral-800"
+          >
+            Asesoría
+          </Link>
         </nav>
 
         {/* Acciones derecha */}
@@ -131,15 +137,22 @@ export function Navbar() {
           )}
           <nav className="flex flex-col gap-1">
             {links.map((l) => (
-              <a
+              <Link
                 key={l.label}
                 href={l.href}
                 onClick={() => setMobileOpen(false)}
                 className="px-3 py-3 rounded-xl text-sm font-medium text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors"
               >
                 {l.label}
-              </a>
+              </Link>
             ))}
+            <Link
+              href="/asesoria"
+              onClick={() => setMobileOpen(false)}
+              className="px-3 py-3 rounded-xl text-sm font-medium text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors"
+            >
+              Asesoría
+            </Link>
           </nav>
           <div className="pt-3 border-t border-slate-200 dark:border-neutral-800">
             {isPro ? (

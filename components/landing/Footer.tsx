@@ -100,9 +100,12 @@ export function Footer() {
               <Link href="/cotizar/profesional" className="text-sm text-slate-500 dark:text-zinc-400 hover:text-orange-500 transition-colors">
                 Cotizar Prototipo
               </Link>
-              <a href="#portfolio" className="text-sm text-slate-500 dark:text-zinc-400 hover:text-orange-500 transition-colors">
+              <Link href="/asesoria" className="text-sm text-slate-500 dark:text-zinc-400 hover:text-orange-500 transition-colors">
+                Asesoría Técnica
+              </Link>
+              <Link href="/#portfolio" className="text-sm text-slate-500 dark:text-zinc-400 hover:text-orange-500 transition-colors">
                 Galería
-              </a>
+              </Link>
             </div>
           </div>
         </div>
