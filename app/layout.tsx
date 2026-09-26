@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://inventov3d.vercel.app"),
   title: "INVENTOV — Impresión 3D",
   description: "Impresión 3D bajo demanda. Desde prototipos hasta series cortas.",
+  verification: {
+    google: "AVy6oJRNb2uMhx7KQgTGogAoVh0jtdBWVV3TeeOWGm4", // IMPORTANTE: Si tu código es más largo, completa el texto aquí.
+  },
   openGraph: {
     title: "INVENTOV — Impresión 3D y Prototipado",
     description: "Materializa tus ideas con nuestro servicio de manufactura y diseño CAD.",
