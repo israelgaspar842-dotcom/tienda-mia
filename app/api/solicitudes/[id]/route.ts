@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 
-const ESTADOS = ["Pendiente", "Cotizado", "Imprimiendo", "Terminado"] as const;
+const ESTADOS = ["Pendiente", "Cotizado", "Imprimiendo", "Terminado", "Archivado"] as const;
 
 async function isAdminRequest(): Promise<boolean> {
   try {

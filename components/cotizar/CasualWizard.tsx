@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Link2, Palette, User, Gift, Sparkles, Check, Upload } from "lucide-react";
 import { WizardShell } from "./WizardShell";
+import { EstimadorTallas } from "@/components/landing/EstimadorTallas";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -230,6 +231,11 @@ export function CasualWizard() {
               <Gift className="h-5 w-5 text-orange-500" /> ¿Qué quieres imprimir?
             </h2>
             <p className="text-sm text-slate-500 dark:text-zinc-400">Sube una imagen de referencia o pega un link de tu modelo.</p>
+          </div>
+
+          {/* Sección educativa previa — "Calcula tu talla estimada" antes de los inputs */}
+          <div className="mb-8">
+            <EstimadorTallas compact />
           </div>
 
           <div className="space-y-3">

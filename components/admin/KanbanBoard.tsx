@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Gift, Cog, Download, DollarSign, Check, MessageCircle, Printer, CheckCircle2, Archive, Loader2 } from "lucide-react";
+import { Gift, Cog, Download, DollarSign, Check, MessageCircle, Printer, CheckCircle2, Archive, Loader2, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 
 // Tipos alineados con supabase/solicitudes.sql y models/Solicitud.ts
 export type TipoPedido = "casual" | "profesional";
-export type EstadoPedido = "Pendiente" | "Cotizado" | "Imprimiendo" | "Terminado";
+export type EstadoPedido = "Pendiente" | "Cotizado" | "Imprimiendo" | "Terminado" | "Archivado";
 
 export type Solicitud = {
   id: string;
@@ -31,6 +31,7 @@ const ESTADO_META: Record<EstadoPedido, { label: string; dot: string; header: st
   Cotizado: { label: "Cotizado", dot: "bg-sky-500", header: "bg-sky-500/10 border-sky-500/20 text-sky-400" },
   Imprimiendo: { label: "Imprimiendo", dot: "bg-violet-500", header: "bg-violet-500/10 border-violet-500/20 text-violet-400" },
   Terminado: { label: "Terminado", dot: "bg-emerald-500", header: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" },
+  Archivado: { label: "Archivado", dot: "bg-zinc-500", header: "bg-zinc-500/10 border-zinc-500/20 text-zinc-400" },
 };
 
 function formatDate(d?: string) {
@@ -100,11 +101,13 @@ function SolicitudCard({
   onCotizar,
   onDownload,
   onTransition,
+  onArchive,
 }: {
   solicitud: Solicitud;
   onCotizar: (id: string, precio: number) => Promise<void>;
   onDownload: (s: Solicitud) => Promise<void>;
   onTransition: (id: string, nextEstado: EstadoPedido) => Promise<void>;
+  onArchive: (id: string) => Promise<boolean>;
 }) {
   const meta = solicitud.metadata ?? {};
   const isCasual = solicitud.tipo_pedido === "casual";
@@ -113,6 +116,7 @@ function SolicitudCard({
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [transitioning, setTransitioning] = useState<EstadoPedido | null>(null);
+  const [archiving, setArchiving] = useState(false);
   const [msg, setMsg] = useState("");
 
   // Genera URL pública real para casual-uploads (evita 404 por ruta relativa)
@@ -183,6 +187,19 @@ function SolicitudCard({
     }
   };
 
+  const handleArchivar = async () => {
+    setArchiving(true);
+    setMsg("");
+    try {
+      const ok = await onArchive(getId(solicitud));
+      if (!ok) return; // confirmación cancelada — no hace nada
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Error al archivar");
+    } finally {
+      setArchiving(false);
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -201,7 +218,20 @@ function SolicitudCard({
           {isCasual ? <Gift className="h-3 w-3" /> : <Cog className="h-3 w-3" />}
           {isCasual ? "Casual" : "Profesional"}
         </span>
-        <span className="text-[11px] text-zinc-500">{formatDate(solicitud.created_at ?? solicitud.createdAt)}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-zinc-500">{formatDate(solicitud.created_at ?? solicitud.createdAt)}</span>
+          {/* Archivar (soft delete) — esquina superior derecha junto a la fecha */}
+          <button
+            type="button"
+            onClick={handleArchivar}
+            disabled={archiving}
+            title="Archivar cotización (desaparece del tablero, sigue en Supabase)"
+            aria-label="Archivar cotización"
+            className="p-1.5 rounded-lg border border-transparent text-zinc-500 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {archiving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          </button>
+        </div>
       </div>
 
       {/* Nombre del cliente — nueva columna `nombre` */}
@@ -392,15 +422,16 @@ function SolicitudCard({
       )}
       {solicitud.estado === "Terminado" && (
         <button
-          disabled
-          className="w-full h-9 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-400 text-xs font-bold flex items-center justify-center gap-2 opacity-60 cursor-not-allowed"
-          title="Pieza terminada — opcional archivar fuera del tablero"
+          onClick={handleArchivar}
+          disabled={archiving}
+          className="w-full h-9 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 hover:border-red-500/40 text-zinc-300 hover:text-red-400 text-xs font-bold flex items-center justify-center gap-2"
+          title="Archivar fuera del tablero — el registro sigue en Supabase"
         >
-          <Archive className="h-4 w-4" /> Archivado / Entregado ✓
+          {archiving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />} Archivado / Entregado ✓
         </button>
       )}
       {solicitud.estado === "Terminado" && (
-        <p className="text-[11px] text-zinc-600 text-center font-mono">Puedes ocultar esta tarjeta manualmente</p>
+        <p className="text-[11px] text-zinc-600 text-center font-mono">Al archivar, la tarjeta desaparece del tablero</p>
       )}
     </div>
   );
@@ -416,9 +447,11 @@ export default function KanbanBoard({ initialSolicitudes }: { initialSolicitudes
       Cotizado: [],
       Imprimiendo: [],
       Terminado: [],
+      Archivado: [],
     };
     for (const s of solicitudes) {
       const est = (s.estado as EstadoPedido) || "Pendiente";
+      if (est === "Archivado") continue; // soft delete: fuera del tablero, sigue en Supabase
       if (ESTADOS.includes(est)) g[est].push(s);
       else g["Pendiente"].push(s);
     }
@@ -476,6 +509,33 @@ export default function KanbanBoard({ initialSolicitudes }: { initialSolicitudes
     const updated = await res.json().catch(() => null);
     // Mutación local optimista — mueve visualmente al instante a la columna correcta
     setSolicitudes((prev) => prev.map((s) => (getId(s) === id ? ({ ...s, ...(updated ?? {}), estado: nextEstado } as Solicitud) : s)));
+  };
+
+  // Archivar (soft delete) — estado 'Archivado': desaparece del tablero pero el registro sigue en Supabase
+  const handleArchive = async (id: string): Promise<boolean> => {
+    if (!window.confirm("¿Estás seguro de archivar esta cotización? Desaparecerá del tablero.")) return false;
+
+    const supabase = createClient();
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      const { data, error } = await supabase.from("solicitudes").update({ estado: "Archivado" }).eq("id", id).select().single();
+      if (!error && data) {
+        // Refresco local inmediato — tarjeta sale del tablero
+        setSolicitudes((prev) => prev.filter((s) => getId(s) !== id));
+        return true;
+      }
+      if (error) console.warn("Supabase archive fallo, fallback API:", error.message);
+    }
+    const res = await fetch(`/api/solicitudes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado: "Archivado" }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error((j as { error?: string }).error || "Error al archivar");
+    }
+    setSolicitudes((prev) => prev.filter((s) => getId(s) !== id));
+    return true;
   };
 
   const handleDownload = async (s: Solicitud) => {
@@ -550,6 +610,7 @@ export default function KanbanBoard({ initialSolicitudes }: { initialSolicitudes
                       onCotizar={handleCotizar}
                       onDownload={handleDownload}
                       onTransition={handleTransition}
+                      onArchive={handleArchive}
                     />
                   ))
                 )}

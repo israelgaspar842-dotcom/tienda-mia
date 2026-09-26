@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { uploadToProVault } from "@/lib/proVault";
 
-const ESTADOS = ["Pendiente", "Cotizado", "Imprimiendo", "Terminado"] as const;
+const ESTADOS = ["Pendiente", "Cotizado", "Imprimiendo", "Terminado", "Archivado"] as const;
 const TIPOS = ["casual", "profesional"] as const;
 
 async function isAdminRequest(): Promise<boolean> {

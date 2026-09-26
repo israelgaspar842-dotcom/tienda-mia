@@ -48,8 +48,8 @@ function LoginForm() {
             <p className="text-xs font-mono text-zinc-500 tracking-widest uppercase">Acceso restringido</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
+          <form onSubmit={handleSubmit} className="space-y-4" suppressHydrationWarning={true}>
+            <div className="space-y-1.5" suppressHydrationWarning={true}>
               <label htmlFor="email" className="text-xs font-bold tracking-widest uppercase text-zinc-300">
                 Email
               </label>
@@ -62,10 +62,11 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@inventov.cl"
+                suppressHydrationWarning={true}
                 className="w-full h-11 px-4 rounded-xl bg-zinc-950 border border-zinc-800 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" suppressHydrationWarning={true}>
               <label htmlFor="password" className="text-xs font-bold tracking-widest uppercase text-zinc-300">
                 Contraseña
               </label>
@@ -77,6 +78,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                suppressHydrationWarning={true}
                 className="w-full h-11 px-4 rounded-xl bg-zinc-950 border border-zinc-800 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
               />
             </div>

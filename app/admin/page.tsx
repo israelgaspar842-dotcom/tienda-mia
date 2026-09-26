@@ -28,7 +28,7 @@ export default async function AdminPage() {
   try {
     const supabase = await createServerSupabaseClient();
     const [solicRes, portRes] = await Promise.all([
-      supabase.from("solicitudes").select("*").order("created_at", { ascending: false }),
+      supabase.from("solicitudes").select("*").neq("estado", "Archivado").order("created_at", { ascending: false }),
       // Lectura incluye nuevos campos es_destacado y galeria — requisito: SELECT id, titulo, es_destacado FROM portfolio (ampliado para grid + galeria)
       supabase
         .from("portfolio")

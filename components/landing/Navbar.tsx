@@ -34,7 +34,7 @@ export function Navbar() {
 
   const linksCasual = [
     { label: "Galería de Regalos", href: "/#portfolio" },
-    { label: "Cómo funciona", href: "/#proceso" },
+    { label: "Cómo funciona", href: "/#como-funciona" },
     { label: "Rastrea tu pedido", href: "/#rastreo" },
   ];
 
