@@ -102,7 +102,7 @@ export async function HeroBanner() {
           </div>
         </div>
 
-        <div className="relative w-full min-h-[300px] md:min-h-[500px] order-1 md:order-2 overflow-hidden bg-white shadow-xl border border-neutral-200 rounded-2xl dark:bg-neutral-900 dark:border-neutral-800 dark:shadow-2xl">
+        <div className="relative w-full min-h-[300px] md:min-h-[500px] order-1 md:order-2 overflow-hidden bg-white bg-transparent shadow-xl border border-neutral-200 rounded-2xl">
           {/* Renderiza el carrusel solo si hay proyectos destacados */}
           {destacados && destacados.length > 0 ? (
             <div style={{ height: "500px", position: "relative" }} className="w-full">
